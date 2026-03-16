@@ -27,15 +27,15 @@ jobs:
 
       - name: Deploy backend to staging
         working-directory: backend
-        run: railway up --service backend --detach
+        run: railway up --service 652d357c-7b4f-418b-b4a3-7e4ad087d364 --detach
 
       - name: Deploy celery-worker to staging
         working-directory: backend
-        run: railway up --service celery-worker --detach
+        run: railway up --service f39e6d8e-18f2-4f06-b330-dc1dae88dc3a --detach
 
       - name: Deploy frontend to staging
         working-directory: frontend
-        run: railway up --service frontend --detach
+        run: railway up --service f307e246-f170-4865-9274-ffde9532792e --detach
 
   deploy-production:
     name: Deploy to Production
@@ -52,12 +52,12 @@ jobs:
 
       - name: Deploy backend to production
         working-directory: backend
-        run: railway up --service backend --detach
+        run: railway up --service 652d357c-7b4f-418b-b4a3-7e4ad087d364 --detach
 
       - name: Deploy celery-worker to production
         working-directory: backend
-        run: railway up --service celery-worker --detach
+        run: railway up --service f39e6d8e-18f2-4f06-b330-dc1dae88dc3a --detach
 
       - name: Deploy frontend to production
         working-directory: frontend
-        run: railway up --service frontend --detach
+        run: railway up --service f307e246-f170-4865-9274-ffde9532792e --detach
