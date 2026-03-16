@@ -16,8 +16,8 @@ class Settings(BaseSettings):
     # Redis / Celery
     redis_url: str = "redis://localhost:6379/0"
 
-    # Anthropic
-    anthropic_api_key: str
+    # OpenAI
+    openai_api_key: str
 
     # Google OAuth
     google_client_id: str

@@ -1,5 +1,5 @@
 import yaml
-from anthropic import Anthropic
+from openai import OpenAI
 
 from app.core.config import settings
 
@@ -41,23 +41,23 @@ Create 8-15 slides total. Group related transcript segments into coherent slides
 def generate_slides_from_transcript(transcript: list[dict], video_id: str) -> dict:
     transcript_text = _format_transcript(transcript)
 
-    client = Anthropic(api_key=settings.anthropic_api_key)
-    message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+    client = OpenAI(api_key=settings.openai_api_key)
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
         max_tokens=4096,
-        system=SYSTEM_PROMPT,
         messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
             {
                 "role": "user",
                 "content": (
                     f"Create a slide deck from this transcript of YouTube video {video_id}.\n\n"
                     f"Transcript:\n{transcript_text}"
                 ),
-            }
+            },
         ],
     )
 
-    raw_yaml = message.content[0].text.strip()
+    raw_yaml = response.choices[0].message.content.strip()
     # Strip markdown fences if present
     if raw_yaml.startswith("```"):
         lines = raw_yaml.split("\n")
