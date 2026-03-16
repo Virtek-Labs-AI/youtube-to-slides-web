@@ -1,2 +1,2 @@
 [deploy]
-preDeployCommand = "alembic upgrade head"
+preDeployCommand = "until alembic upgrade head; do echo 'DB not ready, retrying in 5s...'; sleep 5; done"
