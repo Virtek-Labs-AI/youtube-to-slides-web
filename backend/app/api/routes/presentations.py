@@ -1,13 +1,18 @@
+import os
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.responses import FileResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
+from slowapi import Limiter
+from slowapi.util import get_remote_address
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
+from app.core.config import settings
+from app.core.security import decrypt_token
 from app.db.models import Presentation, PresentationStatus, User
 from app.db.session import get_db
 from app.services.google_slides import import_to_google_slides
@@ -15,10 +20,18 @@ from app.services.transcript import extract_video_id
 from app.tasks.presentation_tasks import generate_presentation
 
 router = APIRouter(prefix="/api/presentations", tags=["presentations"])
+limiter = Limiter(key_func=get_remote_address)
 
 
 class CreatePresentationRequest(BaseModel):
     youtube_url: str
+
+    @field_validator("youtube_url")
+    @classmethod
+    def validate_url_length(cls, v: str) -> str:
+        if len(v) > 2048:
+            raise ValueError("URL is too long")
+        return v.strip()
 
 
 class PresentationResponse(BaseModel):
@@ -39,7 +52,9 @@ class GoogleSlidesResponse(BaseModel):
 
 
 @router.post("", response_model=PresentationResponse, status_code=status.HTTP_201_CREATED)
+@limiter.limit("10/hour")
 async def create_presentation(
+    request: Request,
     body: CreatePresentationRequest,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -118,7 +133,13 @@ async def download_presentation(
             detail="Presentation is not ready for download",
         )
 
-    path = Path(presentation.pptx_path)
+    # Path traversal guard — ensure the file is within the designated storage directory
+    storage_root = os.path.realpath(settings.storage_path)
+    resolved = os.path.realpath(presentation.pptx_path)
+    if not resolved.startswith(storage_root + os.sep) and resolved != storage_root:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden")
+
+    path = Path(resolved)
     if not path.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -134,7 +155,7 @@ async def download_presentation(
 
 
 @router.post("/{presentation_id}/import-google-slides", response_model=GoogleSlidesResponse)
-async def import_google_slides(
+async def import_google_slides_endpoint(
     presentation_id: int,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
@@ -162,16 +183,19 @@ async def import_google_slides(
         )
 
     try:
+        # Decrypt tokens before passing to the Drive API
+        access_token = decrypt_token(user.google_access_token)
+        refresh_token = decrypt_token(user.google_refresh_token) if user.google_refresh_token else None
         url = import_to_google_slides(
             pptx_path=presentation.pptx_path,
             title=presentation.title or f"Slides - {presentation.video_id}",
-            access_token=user.google_access_token,
-            refresh_token=user.google_refresh_token,
+            access_token=access_token,
+            refresh_token=refresh_token,
         )
-    except Exception as exc:
+    except Exception:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
-            detail=f"Failed to import to Google Slides: {exc}",
+            detail="Failed to import to Google Slides. Please try again.",
         )
 
     return GoogleSlidesResponse(google_slides_url=url)

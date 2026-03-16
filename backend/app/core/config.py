@@ -24,6 +24,9 @@ class Settings(BaseSettings):
     google_client_secret: str
     google_redirect_uri: str = "http://localhost:8000/api/auth/callback/google"
 
+    # Token encryption key (Fernet — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+    token_encryption_key: str
+
     # Storage
     storage_path: str = "/tmp/youtube-to-slides"
 

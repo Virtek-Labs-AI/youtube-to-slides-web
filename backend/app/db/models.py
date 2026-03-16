@@ -23,6 +23,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True, nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     picture: Mapped[str | None] = mapped_column(String(1024))
+    # Stored encrypted at rest — use security.encrypt_token/decrypt_token when reading/writing
     google_access_token: Mapped[str | None] = mapped_column(Text)
     google_refresh_token: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
@@ -38,7 +39,7 @@ class Presentation(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
     youtube_url: Mapped[str] = mapped_column(String(2048), nullable=False)
-    video_id: Mapped[str] = mapped_column(String(20), nullable=False)
+    video_id: Mapped[str] = mapped_column(String(11), nullable=False)
     title: Mapped[str | None] = mapped_column(String(500))
     status: Mapped[PresentationStatus] = mapped_column(
         Enum(PresentationStatus), default=PresentationStatus.pending, nullable=False

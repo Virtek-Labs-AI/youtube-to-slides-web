@@ -3,7 +3,6 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
-import { isAuthenticated, removeToken } from "@/lib/auth";
 import api from "@/lib/api";
 import YoutubeForm from "@/components/YoutubeForm";
 import PresentationCard, {
@@ -36,25 +35,19 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAuthenticated()) {
-      router.replace("/");
-      return;
-    }
-
-    const fetchUser = async () => {
+    const init = async () => {
       try {
         const { data } = await api.get("/api/auth/me");
         setUser(data);
+        await fetchPresentations();
       } catch {
-        removeToken();
-        router.replace("/");
+        // 401 interceptor in api.ts will redirect to "/"
       } finally {
         setLoadingUser(false);
       }
     };
 
-    fetchUser();
-    fetchPresentations();
+    init();
   }, [router, fetchPresentations]);
 
   useEffect(() => {
@@ -86,9 +79,12 @@ export default function DashboardPage() {
     await fetchPresentations();
   };
 
-  const handleLogout = () => {
-    removeToken();
-    router.replace("/");
+  const handleLogout = async () => {
+    try {
+      await api.post("/api/auth/logout");
+    } finally {
+      router.replace("/");
+    }
   };
 
   if (loadingUser) {

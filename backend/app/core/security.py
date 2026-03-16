@@ -1,12 +1,15 @@
+import secrets
+import urllib.parse
 from datetime import datetime, timedelta, timezone
 
 import httpx
+from cryptography.fernet import Fernet
 from jose import JWTError, jwt
 
 from app.core.config import settings
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 30
+ACCESS_TOKEN_EXPIRE_HOURS = 24
 
 GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_TOKEN_URL = "https://oauth2.googleapis.com/token"
@@ -20,9 +23,23 @@ GOOGLE_SCOPES = [
 ]
 
 
+def _fernet() -> Fernet:
+    return Fernet(settings.token_encryption_key.encode())
+
+
+def encrypt_token(token: str) -> str:
+    """Encrypt a Google OAuth token before storing in the database."""
+    return _fernet().encrypt(token.encode()).decode()
+
+
+def decrypt_token(encrypted: str) -> str:
+    """Decrypt a Google OAuth token retrieved from the database."""
+    return _fernet().decrypt(encrypted.encode()).decode()
+
+
 def create_access_token(data: dict, expires_delta: timedelta | None = None) -> str:
     to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS))
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS))
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, settings.secret_key, algorithm=ALGORITHM)
 
@@ -35,7 +52,12 @@ def verify_access_token(token: str) -> dict | None:
         return None
 
 
-def get_google_auth_url(state: str | None = None) -> str:
+def generate_oauth_state() -> str:
+    """Generate a cryptographically random state token for OAuth CSRF protection."""
+    return secrets.token_urlsafe(32)
+
+
+def get_google_auth_url(state: str) -> str:
     params = {
         "client_id": settings.google_client_id,
         "redirect_uri": settings.google_redirect_uri,
@@ -43,11 +65,9 @@ def get_google_auth_url(state: str | None = None) -> str:
         "scope": " ".join(GOOGLE_SCOPES),
         "access_type": "offline",
         "prompt": "consent",
+        "state": state,
     }
-    if state:
-        params["state"] = state
-    query = "&".join(f"{k}={v}" for k, v in params.items())
-    return f"{GOOGLE_AUTH_URL}?{query}"
+    return f"{GOOGLE_AUTH_URL}?{urllib.parse.urlencode(params)}"
 
 
 async def exchange_code_for_tokens(code: str) -> dict:

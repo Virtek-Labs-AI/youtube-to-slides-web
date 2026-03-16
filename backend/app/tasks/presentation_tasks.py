@@ -53,5 +53,9 @@ def generate_presentation(presentation_id: int) -> None:
 
         except Exception as exc:
             presentation.status = PresentationStatus.failed
-            presentation.error_message = str(exc)[:2000]
+            # Log the full exception server-side; store a sanitized message for the client
+            import logging
+            logging.getLogger(__name__).exception("Presentation generation failed: %s", presentation_id)
+            exc_type = type(exc).__name__
+            presentation.error_message = f"Generation failed ({exc_type}). Please try again."
             db.commit()

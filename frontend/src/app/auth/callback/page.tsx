@@ -1,23 +1,18 @@
 "use client";
 
 import { useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { setToken } from "@/lib/auth";
-import { Suspense } from "react";
+import { useRouter } from "next/navigation";
 
-function CallbackHandler() {
+/**
+ * The backend sets the JWT as an httpOnly cookie and redirects here.
+ * Nothing to read from the URL — just redirect to the dashboard.
+ */
+export default function AuthCallbackPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
 
   useEffect(() => {
-    const token = searchParams.get("token");
-    if (token) {
-      setToken(token);
-      router.replace("/dashboard");
-    } else {
-      router.replace("/");
-    }
-  }, [router, searchParams]);
+    router.replace("/dashboard");
+  }, [router]);
 
   return (
     <div className="flex min-h-screen items-center justify-center">
@@ -45,19 +40,5 @@ function CallbackHandler() {
         <p className="text-gray-400">Signing you in...</p>
       </div>
     </div>
-  );
-}
-
-export default function AuthCallbackPage() {
-  return (
-    <Suspense
-      fallback={
-        <div className="flex min-h-screen items-center justify-center">
-          <p className="text-gray-400">Loading...</p>
-        </div>
-      }
-    >
-      <CallbackHandler />
-    </Suspense>
   );
 }

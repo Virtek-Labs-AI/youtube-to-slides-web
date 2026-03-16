@@ -1,3 +1,4 @@
+from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
@@ -14,6 +15,11 @@ def import_to_google_slides(
     access_token: str,
     refresh_token: str | None = None,
 ) -> str:
+    """Upload a PPTX to Google Drive, converting it to Google Slides format.
+
+    Automatically refreshes the access token if it has expired, provided a
+    refresh_token and client credentials are available.
+    """
     creds = Credentials(
         token=access_token,
         refresh_token=refresh_token,
@@ -21,6 +27,10 @@ def import_to_google_slides(
         client_id=settings.google_client_id,
         client_secret=settings.google_client_secret,
     )
+
+    # Refresh the access token if it has expired
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
 
     service = build("drive", "v3", credentials=creds)
 
@@ -37,4 +47,7 @@ def import_to_google_slides(
         .execute()
     )
 
-    return created_file.get("webViewLink", f"https://docs.google.com/presentation/d/{created_file['id']}")
+    return created_file.get(
+        "webViewLink",
+        f"https://docs.google.com/presentation/d/{created_file['id']}",
+    )
