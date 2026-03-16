@@ -11,9 +11,9 @@ export default function LandingPage() {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated()) {
-      router.replace("/dashboard");
-    }
+    isAuthenticated().then((authed) => {
+      if (authed) router.replace("/dashboard");
+    });
   }, [router]);
 
   const handleLogin = async () => {
