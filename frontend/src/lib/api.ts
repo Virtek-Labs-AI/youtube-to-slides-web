@@ -1,8 +1,10 @@
 import axios from "axios";
 
+// All API calls go to the Next.js BFF proxy (/api/...) — never directly to the backend.
+// The proxy (src/app/api/[...path]/route.ts) forwards them to FastAPI internally.
 const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000",
-  withCredentials: true, // Send the httpOnly cookie on every request
+  baseURL: "",
+  withCredentials: true,
 });
 
 api.interceptors.response.use(

@@ -22,7 +22,8 @@ class Settings(BaseSettings):
     # Google OAuth
     google_client_id: str
     google_client_secret: str
-    google_redirect_uri: str = "http://localhost:8000/api/auth/callback/google"
+    # BFF pattern: Google redirects to the Next.js frontend proxy, not FastAPI directly.
+    google_redirect_uri: str = "http://localhost:3000/api/auth/callback/google"
 
     # Token encryption key (Fernet — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
     token_encryption_key: str

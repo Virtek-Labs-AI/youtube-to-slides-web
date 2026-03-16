@@ -8,10 +8,7 @@
 
 export async function isAuthenticated(): Promise<boolean> {
   try {
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/auth/me`,
-      { credentials: "include" }
-    );
+    const res = await fetch("/api/auth/me", { credentials: "include" });
     return res.ok;
   } catch {
     return false;
