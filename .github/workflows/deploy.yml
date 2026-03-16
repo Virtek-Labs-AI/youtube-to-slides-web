@@ -27,28 +27,28 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy backend to staging
+        working-directory: backend
         run: |
           railway up \
             --service backend \
             --environment staging \
-            --detach \
-            backend
+            --detach
 
       - name: Deploy celery-worker to staging
+        working-directory: backend
         run: |
           railway up \
             --service celery-worker \
             --environment staging \
-            --detach \
-            backend
+            --detach
 
       - name: Deploy frontend to staging
+        working-directory: frontend
         run: |
           railway up \
             --service frontend \
             --environment staging \
-            --detach \
-            frontend
+            --detach
 
   deploy-production:
     name: Deploy to Production
@@ -65,25 +65,25 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy backend to production
+        working-directory: backend
         run: |
           railway up \
             --service backend \
             --environment production \
-            --detach \
-            backend
+            --detach
 
       - name: Deploy celery-worker to production
+        working-directory: backend
         run: |
           railway up \
             --service celery-worker \
             --environment production \
-            --detach \
-            backend
+            --detach
 
       - name: Deploy frontend to production
+        working-directory: frontend
         run: |
           railway up \
             --service frontend \
             --environment production \
-            --detach \
-            frontend
+            --detach
