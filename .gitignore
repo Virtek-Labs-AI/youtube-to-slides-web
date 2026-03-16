@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+dist/
+*.egg-info/
+.ruff_cache/
+
+# Node
+node_modules/
+.next/
+out/
+
+# Env
+.env
+*.env.local
+token.json
+
+# Generated files
+*.pptx
+app_data/
+
+# Docker
+*.log
+
+# IDE
+.vscode/
+.idea/
