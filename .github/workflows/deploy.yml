@@ -31,7 +31,7 @@ jobs:
             --service backend \
             --environment staging \
             --detach \
-            --dir backend
+            backend
 
       - name: Deploy celery-worker to staging
         env:
@@ -41,7 +41,7 @@ jobs:
             --service celery-worker \
             --environment staging \
             --detach \
-            --dir backend
+            backend
 
       - name: Deploy frontend to staging
         env:
@@ -51,7 +51,7 @@ jobs:
             --service frontend \
             --environment staging \
             --detach \
-            --dir frontend
+            frontend
 
   deploy-production:
     name: Deploy to Production
@@ -72,7 +72,7 @@ jobs:
             --service backend \
             --environment production \
             --detach \
-            --dir backend
+            backend
 
       - name: Deploy celery-worker to production
         env:
@@ -82,7 +82,7 @@ jobs:
             --service celery-worker \
             --environment production \
             --detach \
-            --dir backend
+            backend
 
       - name: Deploy frontend to production
         env:
@@ -92,4 +92,4 @@ jobs:
             --service frontend \
             --environment production \
             --detach \
-            --dir frontend
+            frontend
