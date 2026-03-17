@@ -23,7 +23,8 @@ def configure_structlog() -> None:
         processors=[
             structlog.contextvars.merge_contextvars,
             structlog.stdlib.add_log_level,
-            structlog.stdlib.add_logger_name,
+            # add_logger_name is intentionally omitted — it reads Logger.name which
+            # PrintLogger does not expose. Use structlog.contextvars for logger identity.
             structlog.processors.TimeStamper(fmt="iso"),
             structlog.processors.StackInfoRenderer(),
             structlog.processors.ExceptionRenderer(),

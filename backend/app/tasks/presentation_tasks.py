@@ -1,10 +1,12 @@
 import os
 import uuid
 
+import httpx
 import structlog
 from celery import Celery
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 from app.db.models import Presentation, PresentationStatus
@@ -14,6 +16,9 @@ from app.services.link_injector import inject_references
 from app.services.pptx_renderer import render_pptx
 from app.services.slide_generator import format_slides_as_markdown, generate_slides_from_transcript
 from app.services.transcript import get_transcript
+
+# Transient errors that warrant retrying the Presenton call before falling back.
+_PRESENTON_TRANSIENT_ERRORS = (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPStatusError)
 
 logger = structlog.get_logger(__name__)
 
@@ -53,13 +58,24 @@ def generate_presentation(presentation_id: int) -> None:
             filename = f"{presentation.video_id}_{uuid.uuid4().hex[:8]}.pptx"
 
             if settings.presenton_url:
-                # Generate nicely styled PPTX with Presenton, then inject reference links
-                slides_markdown = format_slides_as_markdown(slides_data)
-                pptx_bytes = presenton_service.generate_pptx(
-                    slides_markdown, presentation.title or presentation.video_id
-                )
-                pptx_bytes = inject_references(pptx_bytes, slides_data)
-                pptx_path = _save_pptx_bytes(pptx_bytes, filename)
+                # Generate nicely styled PPTX with Presenton, then inject reference links.
+                # Retries up to 3 times on transient errors; falls back to plain python-pptx
+                # if Presenton remains unreachable after all attempts.
+                try:
+                    slides_markdown = format_slides_as_markdown(slides_data)
+                    pptx_bytes = _generate_with_presenton(
+                        slides_markdown, presentation.title or presentation.video_id
+                    )
+                    pptx_bytes = inject_references(pptx_bytes, slides_data)
+                    pptx_path = _save_pptx_bytes(pptx_bytes, filename)
+                except (*_PRESENTON_TRANSIENT_ERRORS, TimeoutError, RuntimeError) as presenton_exc:
+                    logger.warning(
+                        "presenton_unavailable_falling_back",
+                        presentation_id=presentation_id,
+                        exc_type=type(presenton_exc).__name__,
+                        metric="presenton_fallback_total",
+                    )
+                    pptx_path = render_pptx(slides_data, filename)
             else:
                 # Fallback: plain python-pptx renderer (dev without Presenton)
                 pptx_path = render_pptx(slides_data, filename)
@@ -87,6 +103,17 @@ def generate_presentation(presentation_id: int) -> None:
             )
             presentation.error_message = f"Generation failed ({type(exc).__name__}). Please try again."
             db.commit()
+
+
+@retry(
+    retry=retry_if_exception_type(_PRESENTON_TRANSIENT_ERRORS),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
+def _generate_with_presenton(slides_markdown: list[str], title: str) -> bytes:
+    """Call Presenton with up to 3 retry attempts on transient connection/HTTP errors."""
+    return presenton_service.generate_pptx(slides_markdown, title)
 
 
 def _save_pptx_bytes(pptx_bytes: bytes, filename: str) -> str:
