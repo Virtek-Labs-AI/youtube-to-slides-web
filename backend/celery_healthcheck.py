@@ -3,6 +3,7 @@
 Runs in a background thread alongside the worker process.
 GET /health → 200 {"status": "ok"}
 """
+
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 

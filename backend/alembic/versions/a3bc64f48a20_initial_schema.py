@@ -5,9 +5,11 @@ Revises:
 Create Date: 2026-03-16 00:00:00.000000
 
 """
+
 from typing import Sequence, Union
 
 import sqlalchemy as sa
+
 from alembic import op
 
 revision: str = "a3bc64f48a20"
@@ -64,9 +66,7 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
         sa.PrimaryKeyConstraint("id"),
     )
-    op.create_index(
-        op.f("ix_presentations_user_id"), "presentations", ["user_id"], unique=False
-    )
+    op.create_index(op.f("ix_presentations_user_id"), "presentations", ["user_id"], unique=False)
 
 
 def downgrade() -> None:
