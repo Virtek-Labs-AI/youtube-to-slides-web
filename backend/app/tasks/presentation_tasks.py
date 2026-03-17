@@ -68,7 +68,7 @@ def generate_presentation(presentation_id: int) -> None:
                     )
                     pptx_bytes = inject_references(pptx_bytes, slides_data)
                     pptx_path = _save_pptx_bytes(pptx_bytes, filename)
-                except (*_PRESENTON_TRANSIENT_ERRORS, TimeoutError) as presenton_exc:
+                except (*_PRESENTON_TRANSIENT_ERRORS, TimeoutError, RuntimeError) as presenton_exc:
                     logger.warning(
                         "presenton_unavailable_falling_back",
                         presentation_id=presentation_id,
