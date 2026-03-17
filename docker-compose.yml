@@ -46,6 +46,26 @@ services:
       timeout: 5s
       retries: 3
 
+  presenton:
+    image: ghcr.io/presenton/presenton:latest
+    profiles:
+      - presenton
+    ports:
+      - "5000:80"
+    environment:
+      - MIGRATE_DATABASE_ON_STARTUP=true
+      - LLM=openai
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=gpt-4o-mini
+      - DISABLE_ANONYMOUS_TRACKING=true
+    volumes:
+      - presenton_data:/app_data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:80/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
   celery_worker:
     build: ./backend
     command: celery -A celery_worker worker --loglevel=info
@@ -77,3 +97,4 @@ services:
 volumes:
   postgres_data:
   slides_storage:
+  presenton_data:

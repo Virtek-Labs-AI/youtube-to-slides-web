@@ -1,17 +1,21 @@
-import logging
 import os
 import uuid
 
+import structlog
 from celery import Celery
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.models import Presentation, PresentationStatus
-from app.services.pptx_renderer import render_pptx
-from app.services.slide_generator import generate_slides_from_transcript
+from app.services import presenton as presenton_service
 from app.services import storage
+from app.services.link_injector import inject_references
+from app.services.pptx_renderer import render_pptx
+from app.services.slide_generator import format_slides_as_markdown, generate_slides_from_transcript
 from app.services.transcript import get_transcript
+
+logger = structlog.get_logger(__name__)
 
 celery_app = Celery("youtube_to_slides", broker=settings.redis_url, backend=settings.redis_url)
 celery_app.conf.task_serializer = "json"
@@ -38,23 +42,31 @@ def generate_presentation(presentation_id: int) -> None:
             # Step 1: Get transcript
             transcript = get_transcript(presentation.video_id)
 
-            # Step 2: Generate slides via Claude
+            # Step 2: Generate slide outline via LLM (content + YouTube URLs)
             slides_data = generate_slides_from_transcript(transcript, presentation.video_id)
 
-            # Extract title from first slide if available
             slides_list = slides_data.get("slides", [])
             if slides_list and slides_list[0].get("title"):
                 presentation.title = slides_list[0]["title"]
 
             # Step 3: Render to PPTX
             filename = f"{presentation.video_id}_{uuid.uuid4().hex[:8]}.pptx"
-            pptx_path = render_pptx(slides_data, filename)
+
+            if settings.presenton_url:
+                # Generate nicely styled PPTX with Presenton, then inject reference links
+                slides_markdown = format_slides_as_markdown(slides_data)
+                pptx_bytes = presenton_service.generate_pptx(
+                    slides_markdown, presentation.title or presentation.video_id
+                )
+                pptx_bytes = inject_references(pptx_bytes, slides_data)
+                pptx_path = _save_pptx_bytes(pptx_bytes, filename)
+            else:
+                # Fallback: plain python-pptx renderer (dev without Presenton)
+                pptx_path = render_pptx(slides_data, filename)
 
             if storage.is_s3_enabled():
-                # Upload to S3 so the API service (separate Railway container) can access it
                 s3_key = f"presentations/{filename}"
                 storage.upload_pptx(pptx_path, s3_key)
-                # Remove the local temp file after upload
                 try:
                     os.unlink(pptx_path)
                 except OSError:
@@ -68,10 +80,20 @@ def generate_presentation(presentation_id: int) -> None:
 
         except Exception as exc:
             presentation.status = PresentationStatus.failed
-            # Log the full exception server-side; store a sanitized message for the client
-            logging.getLogger(__name__).exception(
-                "Presentation generation failed: %s", presentation_id
+            logger.exception(
+                "presentation_generation_failed",
+                presentation_id=presentation_id,
+                exc_type=type(exc).__name__,
             )
-            exc_type = type(exc).__name__
-            presentation.error_message = f"Generation failed ({exc_type}). Please try again."
+            presentation.error_message = f"Generation failed ({type(exc).__name__}). Please try again."
             db.commit()
+
+
+def _save_pptx_bytes(pptx_bytes: bytes, filename: str) -> str:
+    """Write PPTX bytes to the local storage directory and return the path."""
+    storage_dir = settings.storage_path
+    os.makedirs(storage_dir, exist_ok=True)
+    filepath = os.path.join(storage_dir, filename)
+    with open(filepath, "wb") as f:
+        f.write(pptx_bytes)
+    return filepath
