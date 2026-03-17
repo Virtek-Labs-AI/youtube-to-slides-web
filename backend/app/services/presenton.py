@@ -31,11 +31,14 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
             "content": title,
             "slides_markdown": slides_markdown,
             "n_slides": len(slides_markdown),
-            "template": "general",
+            "template": "neo-modern",
             "tone": "professional",
             "verbosity": "standard",
             "export_as": "pptx",
-            "include_title_slide": False,
+            "include_title_slide": True,
+            "include_table_of_contents": True,
+            "image_type": "stock",
+            "content_generation": "enhance",
         },
         timeout=60.0,  # generous for serverless cold-start wake-up
     )
