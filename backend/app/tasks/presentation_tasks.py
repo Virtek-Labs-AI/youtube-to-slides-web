@@ -107,12 +107,17 @@ def generate_presentation(presentation_id: int) -> None:
 
 @retry(
     retry=retry_if_exception_type(_PRESENTON_TRANSIENT_ERRORS),
-    stop=stop_after_attempt(3),
-    wait=wait_exponential(multiplier=1, min=2, max=10),
+    stop=stop_after_attempt(5),
+    wait=wait_exponential(multiplier=2, min=5, max=30),
     reraise=True,
 )
 def _generate_with_presenton(slides_markdown: list[str], title: str) -> bytes:
-    """Call Presenton with up to 3 retry attempts on transient connection/HTTP errors."""
+    """Call Presenton with up to 5 retry attempts on transient connection/HTTP errors.
+
+    The aggressive backoff (5s → 10s → 20s → 30s) is intentional: Presenton is
+    deployed as a serverless service and may need up to ~30s to cold-start before
+    accepting connections.
+    """
     return presenton_service.generate_pptx(slides_markdown, title)
 
 

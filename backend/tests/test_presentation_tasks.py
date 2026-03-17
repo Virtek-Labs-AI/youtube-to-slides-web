@@ -45,14 +45,14 @@ class TestGenerateWithPresenton:
             result = _generate_with_presenton.__wrapped__(["# Slide 1"], "My Title")
         assert result == expected
 
-    def test_retries_connect_error_three_times(self) -> None:
-        """Retries exactly 3 times (stop_after_attempt=3) on ConnectError before re-raising."""
+    def test_retries_and_succeeds_on_eventual_wake(self) -> None:
+        """Succeeds on 5th attempt, simulating a serverless cold-start recovery."""
         call_count = 0
 
         def flaky(*_args, **_kwargs):
             nonlocal call_count
             call_count += 1
-            if call_count < 3:
+            if call_count < 5:
                 raise httpx.ConnectError("refused")
             return b"success"
 
@@ -60,7 +60,7 @@ class TestGenerateWithPresenton:
             result = _generate_with_presenton(["# Slide"], "Title")
 
         assert result == b"success"
-        assert call_count == 3
+        assert call_count == 5
 
     def test_reraises_after_all_attempts_exhausted(self) -> None:
         """Re-raises ConnectError after all 3 attempts fail (reraise=True)."""
