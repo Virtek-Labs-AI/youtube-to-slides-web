@@ -19,7 +19,7 @@ celery_app.conf.result_serializer = "json"
 _sync_db_url = settings.database_url
 if _sync_db_url.startswith("postgresql+asyncpg://"):
     _sync_db_url = _sync_db_url.replace("postgresql+asyncpg://", "postgresql://", 1)
-_sync_engine = create_engine(_sync_db_url)
+_sync_engine = create_engine(_sync_db_url, pool_pre_ping=True, pool_recycle=300)
 
 
 @celery_app.task(name="generate_presentation")
