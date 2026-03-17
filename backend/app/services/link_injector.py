@@ -6,13 +6,14 @@ viewers can jump to the exact moment in the source video for each key point.
 """
 
 import io
+from typing import Any
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
 from pptx.util import Inches, Pt
 
 
-def inject_references(pptx_bytes: bytes, slides_data: dict) -> bytes:
+def inject_references(pptx_bytes: bytes, slides_data: dict[str, Any]) -> bytes:
     """Append a 'Video References' slide to a Presenton-generated PPTX.
 
     Collects all (slide_title, bullet_text, url) tuples from slides_data
@@ -68,7 +69,7 @@ def inject_references(pptx_bytes: bytes, slides_data: dict) -> bytes:
     return out.getvalue()
 
 
-def _collect_refs(slides_data: dict) -> list[tuple[str, str, str]]:
+def _collect_refs(slides_data: dict[str, Any]) -> list[tuple[str, str, str]]:
     refs: list[tuple[str, str, str]] = []
     for slide in slides_data.get("slides", []):
         title = slide.get("title", "")

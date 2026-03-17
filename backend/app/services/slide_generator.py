@@ -1,3 +1,5 @@
+from typing import Any
+
 import yaml
 from openai import OpenAI
 
@@ -70,7 +72,7 @@ def generate_slides_from_transcript(transcript: list[dict], video_id: str) -> di
     return slides_data
 
 
-def format_slides_as_markdown(slides_data: dict) -> list[str]:
+def format_slides_as_markdown(slides_data: dict[str, Any]) -> list[str]:
     """Convert slide outline to Presenton's slides_markdown format.
 
     Each slide becomes one markdown string. Bullets with URLs are rendered as

@@ -1,7 +1,7 @@
-import logging
 import os
 import uuid
 
+import structlog
 from celery import Celery
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -14,6 +14,8 @@ from app.services.link_injector import inject_references
 from app.services.pptx_renderer import render_pptx
 from app.services.slide_generator import format_slides_as_markdown, generate_slides_from_transcript
 from app.services.transcript import get_transcript
+
+logger = structlog.get_logger(__name__)
 
 celery_app = Celery("youtube_to_slides", broker=settings.redis_url, backend=settings.redis_url)
 celery_app.conf.task_serializer = "json"
@@ -78,11 +80,12 @@ def generate_presentation(presentation_id: int) -> None:
 
         except Exception as exc:
             presentation.status = PresentationStatus.failed
-            logging.getLogger(__name__).exception(
-                "Presentation generation failed: %s", presentation_id
+            logger.exception(
+                "presentation_generation_failed",
+                presentation_id=presentation_id,
+                exc_type=type(exc).__name__,
             )
-            exc_type = type(exc).__name__
-            presentation.error_message = f"Generation failed ({exc_type}). Please try again."
+            presentation.error_message = f"Generation failed ({type(exc).__name__}). Please try again."
             db.commit()
 
 
