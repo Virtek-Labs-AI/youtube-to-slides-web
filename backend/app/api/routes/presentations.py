@@ -141,7 +141,7 @@ async def download_presentation(
         # A redirect to a pre-signed URL fails when the frontend fetches with
         # withCredentials=true because S3 returns Access-Control-Allow-Origin: *,
         # which browsers block for credentialed requests.
-        safe_filename = storage._safe_filename(filename)
+        safe_filename = storage.safe_filename(filename)
         return StreamingResponse(
             storage.stream_pptx(presentation.pptx_path),
             media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",

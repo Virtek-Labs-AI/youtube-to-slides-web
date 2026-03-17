@@ -36,7 +36,7 @@ def is_s3_enabled() -> bool:
     return bool(settings.s3_bucket)
 
 
-def _safe_filename(filename: str) -> str:
+def safe_filename(filename: str) -> str:
     """Strip characters that would break a Content-Disposition header filename value."""
     return re.sub(r'["\\\r\n]', "_", filename)
 
