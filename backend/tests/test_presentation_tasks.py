@@ -7,7 +7,7 @@ Covers:
 - RuntimeError from Presenton triggers fallback (not hard failure)
 """
 
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
@@ -19,29 +19,33 @@ from app.tasks.presentation_tasks import _PRESENTON_TRANSIENT_ERRORS, _generate_
 # _generate_with_presenton — retry behaviour
 # ---------------------------------------------------------------------------
 
+def _make_transient_exc(exc_class: type) -> Exception:
+    """Construct a transient exception instance; HTTPStatusError requires extra kwargs."""
+    if exc_class is httpx.HTTPStatusError:
+        return exc_class("boom", request=MagicMock(), response=MagicMock())
+    return exc_class("boom")
+
+
 class TestGenerateWithPresenton:
     """_generate_with_presenton retries on every type in _PRESENTON_TRANSIENT_ERRORS."""
 
     @pytest.mark.parametrize("exc_class", _PRESENTON_TRANSIENT_ERRORS)
-    def test_retries_on_transient_errors(self, exc_class):
-        """Retries up to 3 times on each transient error, then re-raises."""
-        mock_generate = MagicMock(side_effect=exc_class("boom"))
+    def test_raises_on_single_call(self, exc_class: type) -> None:
+        """The unwrapped function propagates each transient error on a single call."""
+        exc = _make_transient_exc(exc_class)
+        mock_generate = MagicMock(side_effect=exc)
         with patch("app.tasks.presentation_tasks.presenton_service.generate_pptx", mock_generate):
-            with pytest.raises(exc_class):
+            with pytest.raises(type(exc)):
                 _generate_with_presenton.__wrapped__(["slide"], "title")
 
-        # The @retry decorator calls the underlying function directly;
-        # test the wrapped function via the retry decorator by calling the public function
-        # and asserting it re-raises after the configured number of attempts.
-
-    def test_returns_bytes_on_success(self):
+    def test_returns_bytes_on_success(self) -> None:
         """Returns bytes from presenton_service.generate_pptx on success."""
         expected = b"pptx-bytes"
         with patch("app.tasks.presentation_tasks.presenton_service.generate_pptx", return_value=expected):
             result = _generate_with_presenton.__wrapped__(["# Slide 1"], "My Title")
         assert result == expected
 
-    def test_retries_connect_error_three_times(self):
+    def test_retries_connect_error_three_times(self) -> None:
         """Retries exactly 3 times (stop_after_attempt=3) on ConnectError before re-raising."""
         call_count = 0
 
@@ -58,7 +62,7 @@ class TestGenerateWithPresenton:
         assert result == b"success"
         assert call_count == 3
 
-    def test_reraises_after_all_attempts_exhausted(self):
+    def test_reraises_after_all_attempts_exhausted(self) -> None:
         """Re-raises ConnectError after all 3 attempts fail (reraise=True)."""
         with patch(
             "app.tasks.presentation_tasks.presenton_service.generate_pptx",
@@ -75,7 +79,7 @@ class TestGenerateWithPresenton:
 class TestGeneratePresentationFallback:
     """generate_presentation falls back to render_pptx when Presenton fails."""
 
-    def _make_presentation(self, video_id="abc123"):
+    def _make_presentation(self, video_id: str = "abc123") -> MagicMock:
         p = MagicMock()
         p.video_id = video_id
         p.title = None
@@ -123,7 +127,7 @@ class TestGeneratePresentationFallback:
             RuntimeError("Presenton generation failed: quota exceeded"),
         ],
     )
-    def test_falls_back_to_render_pptx_on_presenton_failure(self, _common_patches, exc):
+    def test_falls_back_to_render_pptx_on_presenton_failure(self, _common_patches, exc: Exception) -> None:
         """Falls back to render_pptx for every error type that Presenton can raise."""
         from app.tasks.presentation_tasks import generate_presentation
 
@@ -135,10 +139,8 @@ class TestGeneratePresentationFallback:
 
         _common_patches["mock_render"].assert_called_once()
 
-    def test_warning_log_emitted_with_metric_field(self, _common_patches, caplog):
+    def test_warning_log_emitted_with_metric_field(self, _common_patches, caplog) -> None:
         """Warning log includes metric='presenton_fallback_total' on fallback."""
-        import logging
-
         from app.tasks.presentation_tasks import generate_presentation
 
         with (
@@ -154,7 +156,7 @@ class TestGeneratePresentationFallback:
         _, kwargs = mock_logger.warning.call_args
         assert kwargs.get("metric") == "presenton_fallback_total"
 
-    def test_presentation_status_done_after_fallback(self, _common_patches):
+    def test_presentation_status_done_after_fallback(self, _common_patches) -> None:
         """Presentation status is set to done even when Presenton fallback is used."""
         from app.db.models import PresentationStatus
         from app.tasks.presentation_tasks import generate_presentation
