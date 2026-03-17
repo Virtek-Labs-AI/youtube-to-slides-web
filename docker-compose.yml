@@ -48,6 +48,8 @@ services:
 
   presenton:
     image: ghcr.io/presenton/presenton:latest
+    profiles:
+      - presenton
     ports:
       - "5000:80"
     environment:
@@ -73,8 +75,6 @@ services:
       db:
         condition: service_healthy
       redis:
-        condition: service_healthy
-      presenton:
         condition: service_healthy
     volumes:
       - slides_storage:/tmp/youtube-to-slides

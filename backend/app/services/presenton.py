@@ -10,7 +10,7 @@ from typing import Any
 
 import httpx
 import structlog
-from tenacity import RetryError, retry, retry_if_result, stop_after_attempt, wait_fixed
+from tenacity import RetryError, retry, retry_if_exception_type, retry_if_result, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
 
@@ -58,9 +58,9 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
 
 
 @retry(
-    wait=wait_fixed(5),
+    wait=wait_exponential(multiplier=1, min=5, max=10),
     stop=stop_after_attempt(120),
-    retry=retry_if_result(lambda result: result is None),
+    retry=retry_if_result(lambda result: result is None) | retry_if_exception_type(httpx.HTTPStatusError),
 )
 def _poll_until_complete(base_url: str, task_id: str) -> dict[str, Any] | None:
     """Poll the Presenton status endpoint until generation completes.

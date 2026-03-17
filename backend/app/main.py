@@ -9,6 +9,9 @@ from slowapi.util import get_remote_address
 
 from app.api.routes import auth, presentations
 from app.core.config import settings
+from app.core.logging import configure_structlog
+
+configure_structlog()
 
 
 @asynccontextmanager
