@@ -37,7 +37,7 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
             "export_as": "pptx",
             "include_title_slide": False,
         },
-        timeout=30.0,
+        timeout=60.0,  # generous for serverless cold-start wake-up
     )
     resp.raise_for_status()
     task_id = resp.json()["id"]
