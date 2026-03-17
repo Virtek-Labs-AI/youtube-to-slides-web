@@ -1,3 +1,4 @@
+import os
 import re
 from dataclasses import dataclass
 
@@ -40,8 +41,21 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 
+def _get_proxies() -> dict[str, str] | None:
+    """Build proxy dict from environment variables if configured.
+
+    Set YOUTUBE_PROXY_URL to a full proxy URL, e.g.:
+      http://user:pass@proxy.webshare.io:80
+    """
+    proxy_url = os.environ.get("YOUTUBE_PROXY_URL")
+    if proxy_url:
+        return {"http": proxy_url, "https": proxy_url}
+    return None
+
+
 def get_transcript(video_id: str) -> list[dict]:
-    ytt_api = YouTubeTranscriptApi()
+    proxies = _get_proxies()
+    ytt_api = YouTubeTranscriptApi(proxies=proxies)
     transcript = ytt_api.fetch(video_id)
 
     segments: list[dict] = []
