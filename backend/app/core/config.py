@@ -1,4 +1,3 @@
-from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,10 +36,10 @@ class Settings(BaseSettings):
     # When s3_bucket is set, PPTX files are stored in S3 instead of local disk.
     # Required for Railway deployments where API and Celery run as separate services.
     s3_bucket: str | None = None
-    s3_endpoint_url: str | None = None  # Set for R2/MinIO; leave None for AWS S3
-    s3_access_key_id: SecretStr | None = None
-    s3_secret_access_key: SecretStr | None = None
-    s3_region: str = "auto"  # Use "auto" for R2, real region for AWS S3
+    # Set for Cloudflare R2 / MinIO; leave unset for AWS S3.
+    # Credentials and region come from standard AWS env vars:
+    # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION.
+    s3_endpoint_url: str | None = None
 
 
 settings = Settings()  # type: ignore[call-arg]
