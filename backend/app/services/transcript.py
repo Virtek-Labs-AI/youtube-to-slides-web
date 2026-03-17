@@ -1,9 +1,10 @@
 import os
 import re
 from dataclasses import dataclass
+from urllib.parse import urlparse
 
 from youtube_transcript_api import YouTubeTranscriptApi
-from youtube_transcript_api.proxies import GenericProxyConfig
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 
 
 @dataclass
@@ -42,16 +43,25 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 
-def _get_proxy_config() -> GenericProxyConfig | None:
-    """Build proxy config from environment variables if configured.
+def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig | None:
+    """Build proxy config from YOUTUBE_PROXY_URL.
 
-    Set YOUTUBE_PROXY_URL to a full proxy URL, e.g.:
-      http://user:pass@proxy.webshare.io:80
+    If the URL contains credentials and points to webshare.io, uses
+    WebshareProxyConfig for rotating residential IPs. Otherwise falls
+    back to GenericProxyConfig.
+
+    Expected format: http://user:pass@proxy.webshare.io:80
     """
     proxy_url = os.environ.get("YOUTUBE_PROXY_URL")
-    if proxy_url:
-        return GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
-    return None
+    if not proxy_url:
+        return None
+    parsed = urlparse(proxy_url)
+    if parsed.username and parsed.password and "webshare" in (parsed.hostname or ""):
+        return WebshareProxyConfig(
+            proxy_username=parsed.username,
+            proxy_password=parsed.password,
+        )
+    return GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
 
 
 def get_transcript(video_id: str) -> list[dict]:
