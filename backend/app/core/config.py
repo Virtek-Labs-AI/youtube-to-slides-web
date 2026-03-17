@@ -29,8 +29,17 @@ class Settings(BaseSettings):
     # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str
 
-    # Storage
+    # Storage (local fallback for docker-compose dev)
     storage_path: str = "/tmp/youtube-to-slides"
+
+    # S3-compatible object storage (AWS S3, Cloudflare R2, etc.)
+    # When s3_bucket is set, PPTX files are stored in S3 instead of local disk.
+    # Required for Railway deployments where API and Celery run as separate services.
+    s3_bucket: str | None = None
+    s3_endpoint_url: str | None = None  # Set for R2/MinIO; leave None for AWS S3
+    s3_access_key_id: str | None = None
+    s3_secret_access_key: str | None = None
+    s3_region: str = "auto"  # Use "auto" for R2, real region for AWS S3
 
 
 settings = Settings()  # type: ignore[call-arg]

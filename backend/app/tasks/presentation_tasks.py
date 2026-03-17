@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 
 from celery import Celery
@@ -9,6 +10,7 @@ from app.core.config import settings
 from app.db.models import Presentation, PresentationStatus
 from app.services.pptx_renderer import render_pptx
 from app.services.slide_generator import generate_slides_from_transcript
+from app.services import storage
 from app.services.transcript import get_transcript
 
 celery_app = Celery("youtube_to_slides", broker=settings.redis_url, backend=settings.redis_url)
@@ -48,7 +50,19 @@ def generate_presentation(presentation_id: int) -> None:
             filename = f"{presentation.video_id}_{uuid.uuid4().hex[:8]}.pptx"
             pptx_path = render_pptx(slides_data, filename)
 
-            presentation.pptx_path = pptx_path
+            if storage.is_s3_enabled():
+                # Upload to S3 so the API service (separate Railway container) can access it
+                s3_key = f"presentations/{filename}"
+                storage.upload_pptx(pptx_path, s3_key)
+                # Remove the local temp file after upload
+                try:
+                    os.unlink(pptx_path)
+                except OSError:
+                    pass
+                presentation.pptx_path = s3_key
+            else:
+                presentation.pptx_path = pptx_path
+
             presentation.status = PresentationStatus.done
             db.commit()
 
