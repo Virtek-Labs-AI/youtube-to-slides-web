@@ -76,5 +76,5 @@ def _format_transcript(transcript: list[dict]) -> str:
         minutes = int(seg["start"] // 60)
         seconds = int(seg["start"] % 60)
         timestamp = f"[{minutes:02d}:{seconds:02d}]"
-        lines.append(f'{timestamp} {seg["text"]} ({seg["url"]})')
+        lines.append(f"{timestamp} {seg['text']} ({seg['url']})")
     return "\n".join(lines)
