@@ -12,7 +12,7 @@ import os
 import re
 import tempfile
 from contextlib import contextmanager
-from typing import TYPE_CHECKING, Generator
+from typing import Generator
 
 import boto3
 from botocore.client import BaseClient
@@ -22,18 +22,12 @@ from app.core.config import settings
 
 
 def _s3_client() -> BaseClient:
+    # Credentials and region are read from the standard AWS environment variables:
+    # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION.
+    # Only endpoint_url needs explicit wiring (for R2/MinIO; omit for AWS S3).
     return boto3.client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
-        aws_access_key_id=(
-            settings.s3_access_key_id.get_secret_value() if settings.s3_access_key_id else None
-        ),
-        aws_secret_access_key=(
-            settings.s3_secret_access_key.get_secret_value()
-            if settings.s3_secret_access_key
-            else None
-        ),
-        region_name=settings.s3_region,
         config=Config(signature_version="s3v4"),
     )
 
