@@ -41,5 +41,12 @@ class Settings(BaseSettings):
     # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION.
     s3_endpoint_url: str | None = None
 
+    # Presenton self-hosted presentation generator (optional)
+    # When set, the Celery worker calls Presenton to generate visually styled slides,
+    # then injects YouTube reference links with python-pptx.
+    # Use the internal service URL, e.g. http://presenton:5000 (docker-compose / Railway).
+    # When unset, the plain python-pptx renderer is used as a fallback.
+    presenton_url: str | None = None
+
 
 settings = Settings()  # type: ignore[call-arg]

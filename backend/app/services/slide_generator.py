@@ -70,6 +70,31 @@ def generate_slides_from_transcript(transcript: list[dict], video_id: str) -> di
     return slides_data
 
 
+def format_slides_as_markdown(slides_data: dict) -> list[str]:
+    """Convert slide outline to Presenton's slides_markdown format.
+
+    Each slide becomes one markdown string. Bullets with URLs are rendered as
+    markdown links so Presenton can attempt to preserve them as hyperlinks.
+    """
+    result: list[str] = []
+    for slide in slides_data.get("slides", []):
+        title = slide.get("title", "")
+        bullets = slide.get("bullets", [])
+        lines = [f"# {title}"]
+        for b in bullets:
+            if not isinstance(b, dict):
+                lines.append(f"- {b}")
+                continue
+            text = b.get("text", "")
+            url = b.get("url", "")
+            if url:
+                lines.append(f"- [{text}]({url})")
+            else:
+                lines.append(f"- {text}")
+        result.append("\n".join(lines))
+    return result
+
+
 def _format_transcript(transcript: list[dict]) -> str:
     lines: list[str] = []
     for seg in transcript:
