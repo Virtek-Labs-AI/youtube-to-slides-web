@@ -1,7 +1,6 @@
 import os
 import re
 from dataclasses import dataclass
-from urllib.parse import urlparse
 
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
@@ -44,27 +43,32 @@ def extract_video_id(url: str) -> str | None:
 
 
 def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig | None:
-    """Build proxy config from YOUTUBE_PROXY_URL.
+    """Build proxy config from environment variables.
 
-    If the URL contains credentials (user:pass), uses WebshareProxyConfig so
-    requests rotate through Webshare's residential IP pool rather than a single
-    static IP. Webshare assigns a direct IP per connection using the credentials;
-    the proxy host in the URL is ignored by WebshareProxyConfig.
+    Two modes:
+    - Webshare residential (rotating): set YOUTUBE_WEBSHARE_USERNAME and
+      YOUTUBE_WEBSHARE_PASSWORD. Uses WebshareProxyConfig which connects to
+      Webshare's own rotating residential infrastructure.
+    - Generic proxy (Decodo, etc.): set YOUTUBE_PROXY_URL as a full proxy URL
+      including credentials, e.g. http://user:pass@gate.decodo.com:10000.
+      Uses GenericProxyConfig which passes credentials via standard HTTP proxy
+      auth.
 
-    Falls back to GenericProxyConfig for credential-less proxy URLs.
-
-    Expected format: http://user:pass@<ip-or-host>:<port>
+    YOUTUBE_WEBSHARE_USERNAME takes precedence if both are set.
     """
-    proxy_url = os.environ.get("YOUTUBE_PROXY_URL")
-    if not proxy_url:
-        return None
-    parsed = urlparse(proxy_url)
-    if parsed.username and parsed.password:
+    webshare_user = os.environ.get("YOUTUBE_WEBSHARE_USERNAME")
+    webshare_pass = os.environ.get("YOUTUBE_WEBSHARE_PASSWORD")
+    if webshare_user and webshare_pass:
         return WebshareProxyConfig(
-            proxy_username=parsed.username,
-            proxy_password=parsed.password,
+            proxy_username=webshare_user,
+            proxy_password=webshare_pass,
         )
-    return GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
+
+    proxy_url = os.environ.get("YOUTUBE_PROXY_URL")
+    if proxy_url:
+        return GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
+
+    return None
 
 
 def get_transcript(video_id: str) -> list[dict]:
