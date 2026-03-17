@@ -1,6 +1,7 @@
 import pytest
 
-from app.services.transcript import extract_video_id
+from app.services.transcript import extract_video_id, _get_proxy_config
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 
 
 @pytest.mark.parametrize(
@@ -39,5 +40,47 @@ from app.services.transcript import extract_video_id
         ("https://www.youtube.com/", None),
     ],
 )
-def test_extract_video_id(url: str, expected: str | None):
+def test_extract_video_id(url: str, expected: str | None) -> None:
     assert extract_video_id(url) == expected
+
+
+# ---------------------------------------------------------------------------
+# _get_proxy_config
+# ---------------------------------------------------------------------------
+
+
+def test_proxy_config_no_env_vars_returns_empty_generic(monkeypatch) -> None:
+    """No proxy env vars → GenericProxyConfig with empty URLs to block system proxy inheritance."""
+    monkeypatch.delenv("YOUTUBE_WEBSHARE_USERNAME", raising=False)
+    monkeypatch.delenv("YOUTUBE_WEBSHARE_PASSWORD", raising=False)
+    monkeypatch.delenv("YOUTUBE_PROXY_URL", raising=False)
+
+    config = _get_proxy_config()
+
+    assert isinstance(config, GenericProxyConfig)
+    assert config.http_url == ""
+    assert config.https_url == ""
+
+
+def test_proxy_config_youtube_proxy_url_returns_generic(monkeypatch) -> None:
+    """YOUTUBE_PROXY_URL set → GenericProxyConfig with that URL for both http and https."""
+    monkeypatch.delenv("YOUTUBE_WEBSHARE_USERNAME", raising=False)
+    monkeypatch.delenv("YOUTUBE_WEBSHARE_PASSWORD", raising=False)
+    monkeypatch.setenv("YOUTUBE_PROXY_URL", "http://user:pass@gate.decodo.com:10000")
+
+    config = _get_proxy_config()
+
+    assert isinstance(config, GenericProxyConfig)
+    assert config.http_url == "http://user:pass@gate.decodo.com:10000"
+    assert config.https_url == "http://user:pass@gate.decodo.com:10000"
+
+
+def test_proxy_config_webshare_creds_returns_webshare(monkeypatch) -> None:
+    """Webshare credentials set → WebshareProxyConfig (takes precedence over YOUTUBE_PROXY_URL)."""
+    monkeypatch.setenv("YOUTUBE_WEBSHARE_USERNAME", "ws_user")
+    monkeypatch.setenv("YOUTUBE_WEBSHARE_PASSWORD", "ws_pass")
+    monkeypatch.setenv("YOUTUBE_PROXY_URL", "http://other:proxy@example.com:9999")
+
+    config = _get_proxy_config()
+
+    assert isinstance(config, WebshareProxyConfig)

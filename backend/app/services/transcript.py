@@ -42,7 +42,7 @@ def extract_video_id(url: str) -> str | None:
     return None
 
 
-def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig | None:
+def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig:
     """Build proxy config from environment variables.
 
     Two modes:
@@ -55,6 +55,11 @@ def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig | None:
       auth.
 
     YOUTUBE_WEBSHARE_USERNAME takes precedence if both are set.
+
+    When neither is set, returns an explicit no-proxy config (empty URL strings).
+    This prevents the underlying requests session from inheriting system proxy
+    env vars (e.g. Railway's HTTPS_PROXY for internal service routing), which
+    would cause a ProxyError when trying to reach external YouTube URLs.
     """
     webshare_user = os.environ.get("YOUTUBE_WEBSHARE_USERNAME")
     webshare_pass = os.environ.get("YOUTUBE_WEBSHARE_PASSWORD")
@@ -68,7 +73,9 @@ def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig | None:
     if proxy_url:
         return GenericProxyConfig(http_url=proxy_url, https_url=proxy_url)
 
-    return None
+    # No YouTube proxy configured. Explicitly disable proxy to prevent requests
+    # from routing YouTube traffic through any system proxy env vars.
+    return GenericProxyConfig(http_url="", https_url="")
 
 
 def get_transcript(video_id: str) -> list[dict]:
