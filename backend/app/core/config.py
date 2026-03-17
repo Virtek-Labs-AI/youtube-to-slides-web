@@ -47,6 +47,10 @@ class Settings(BaseSettings):
     # Use the internal service URL, e.g. http://presenton:5000 (docker-compose / Railway).
     # When unset, the plain python-pptx renderer is used as a fallback.
     presenton_url: str | None = None
+    # Image type for Presenton slides. Set to "stock" to enable Pexels stock photos
+    # (requires PEXELS_API_KEY configured on the Presenton server). Leave unset to
+    # generate slides without images.
+    presenton_image_type: str | None = None
 
 
 settings = Settings()  # type: ignore[call-arg]

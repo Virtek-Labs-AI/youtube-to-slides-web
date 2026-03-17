@@ -73,6 +73,7 @@ def generate_presentation(presentation_id: int) -> None:
                         "presenton_unavailable_falling_back",
                         presentation_id=presentation_id,
                         exc_type=type(presenton_exc).__name__,
+                        exc_msg=str(presenton_exc),
                         metric="presenton_fallback_total",
                     )
                     pptx_path = render_pptx(slides_data, filename)
