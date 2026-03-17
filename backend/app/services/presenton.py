@@ -42,6 +42,12 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
         },
         timeout=60.0,  # generous for serverless cold-start wake-up
     )
+    if resp.is_error:
+        logger.error(
+            "presenton_api_error",
+            status_code=resp.status_code,
+            body=resp.text[:1000],
+        )
     resp.raise_for_status()
     task_id = resp.json()["id"]
     logger.info("presenton_task_submitted", task_id=task_id, n_slides=len(slides_markdown))
