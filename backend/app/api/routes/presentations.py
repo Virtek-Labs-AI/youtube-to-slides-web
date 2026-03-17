@@ -184,8 +184,10 @@ async def import_google_slides_endpoint(
 
     try:
         # Decrypt tokens before passing to the Drive API
-        access_token = decrypt_token(user.google_access_token)
-        refresh_token = decrypt_token(user.google_refresh_token) if user.google_refresh_token else None
+        access_token = decrypt_token(user.google_access_token)  # type: ignore[arg-type]
+        refresh_token = (
+            decrypt_token(user.google_refresh_token) if user.google_refresh_token else None
+        )
         url = import_to_google_slides(
             pptx_path=presentation.pptx_path,
             title=presentation.title or f"Slides - {presentation.video_id}",
