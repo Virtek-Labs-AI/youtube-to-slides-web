@@ -3,12 +3,12 @@ from openai import OpenAI
 
 from app.core.config import settings
 
-SYSTEM_PROMPT = """You are a presentation expert. Given a YouTube video transcript with timestamps, \
-create a structured slide deck in YAML format.
+SYSTEM_PROMPT = """You are a presentation expert. Given a YouTube video \
+transcript with timestamps, create a structured slide deck in YAML format.
 
 Rules:
 - Each bullet point must be 10 words or fewer.
-- Include the YouTube timestamp URL in parentheses after each bullet that references specific content.
+- Include the YouTube timestamp URL after each bullet referencing specific content.
 - The YAML must follow this exact structure.
 
 Output ONLY valid YAML with this structure (no markdown fences, no commentary):
@@ -57,7 +57,7 @@ def generate_slides_from_transcript(transcript: list[dict], video_id: str) -> di
         ],
     )
 
-    raw_yaml = response.choices[0].message.content.strip()
+    raw_yaml = (response.choices[0].message.content or "").strip()
     # Strip markdown fences if present
     if raw_yaml.startswith("```"):
         lines = raw_yaml.split("\n")

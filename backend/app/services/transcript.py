@@ -55,7 +55,7 @@ def _get_proxies() -> dict[str, str] | None:
 
 def get_transcript(video_id: str) -> list[dict]:
     proxies = _get_proxies()
-    ytt_api = YouTubeTranscriptApi(proxies=proxies)
+    ytt_api = YouTubeTranscriptApi(proxies=proxies)  # type: ignore[call-arg]
     transcript = ytt_api.fetch(video_id)
 
     segments: list[dict] = []

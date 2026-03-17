@@ -25,12 +25,12 @@ class Settings(BaseSettings):
     # BFF pattern: Google redirects to the Next.js frontend proxy, not FastAPI directly.
     google_redirect_uri: str = "http://localhost:3000/api/auth/callback/google"
 
-    # Token encryption key (Fernet).
-    # Generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Token encryption key (Fernet symmetric encryption).
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str
 
     # Storage
     storage_path: str = "/tmp/youtube-to-slides"
 
 
-settings = Settings()
+settings = Settings()  # type: ignore[call-arg]
