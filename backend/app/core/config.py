@@ -1,3 +1,4 @@
+from pydantic import SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,8 +38,8 @@ class Settings(BaseSettings):
     # Required for Railway deployments where API and Celery run as separate services.
     s3_bucket: str | None = None
     s3_endpoint_url: str | None = None  # Set for R2/MinIO; leave None for AWS S3
-    s3_access_key_id: str | None = None
-    s3_secret_access_key: str | None = None
+    s3_access_key_id: SecretStr | None = None
+    s3_secret_access_key: SecretStr | None = None
     s3_region: str = "auto"  # Use "auto" for R2, real region for AWS S3
 
 

@@ -9,22 +9,30 @@ settings.storage_path (used in docker-compose dev with a shared named volume).
 """
 
 import os
+import re
 import tempfile
 from contextlib import contextmanager
-from typing import Generator
+from typing import TYPE_CHECKING, Generator
 
 import boto3
+from botocore.client import BaseClient
 from botocore.config import Config
 
 from app.core.config import settings
 
 
-def _s3_client():
+def _s3_client() -> BaseClient:
     return boto3.client(
         "s3",
         endpoint_url=settings.s3_endpoint_url,
-        aws_access_key_id=settings.s3_access_key_id,
-        aws_secret_access_key=settings.s3_secret_access_key,
+        aws_access_key_id=(
+            settings.s3_access_key_id.get_secret_value() if settings.s3_access_key_id else None
+        ),
+        aws_secret_access_key=(
+            settings.s3_secret_access_key.get_secret_value()
+            if settings.s3_secret_access_key
+            else None
+        ),
         region_name=settings.s3_region,
         config=Config(signature_version="s3v4"),
     )
@@ -34,6 +42,11 @@ def is_s3_enabled() -> bool:
     return bool(settings.s3_bucket)
 
 
+def _safe_filename(filename: str) -> str:
+    """Strip characters that would break a Content-Disposition header filename value."""
+    return re.sub(r'["\\\r\n]', "_", filename)
+
+
 def upload_pptx(local_path: str, key: str) -> None:
     """Upload a local PPTX file to S3 under the given key."""
     client = _s3_client()
@@ -41,19 +54,22 @@ def upload_pptx(local_path: str, key: str) -> None:
         local_path,
         settings.s3_bucket,
         key,
-        ExtraArgs={"ContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"},
+        ExtraArgs={
+            "ContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        },
     )
 
 
 def get_presigned_download_url(key: str, filename: str, expires_in: int = 3600) -> str:
     """Return a pre-signed URL that allows direct download of the PPTX from S3."""
     client = _s3_client()
+    safe_name = _safe_filename(filename)
     return client.generate_presigned_url(
         "get_object",
         Params={
             "Bucket": settings.s3_bucket,
             "Key": key,
-            "ResponseContentDisposition": f'attachment; filename="{filename}"',
+            "ResponseContentDisposition": f'attachment; filename="{safe_name}"',
             "ResponseContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         },
         ExpiresIn=expires_in,

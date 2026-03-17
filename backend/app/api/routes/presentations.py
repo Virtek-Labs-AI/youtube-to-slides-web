@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -138,7 +138,6 @@ async def download_presentation(
 
     if storage.is_s3_enabled():
         # pptx_path holds an S3 key — redirect to a pre-signed URL for direct download
-        from fastapi.responses import RedirectResponse
         presigned_url = storage.get_presigned_download_url(presentation.pptx_path, filename)
         return RedirectResponse(url=presigned_url, status_code=302)
 
