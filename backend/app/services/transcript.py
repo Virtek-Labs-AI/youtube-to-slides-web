@@ -56,7 +56,7 @@ def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig | None:
     if not proxy_url:
         return None
     parsed = urlparse(proxy_url)
-    if parsed.username and parsed.password and "webshare" in (parsed.hostname or ""):
+    if parsed.username and parsed.password and (parsed.hostname or "").endswith(".webshare.io"):
         return WebshareProxyConfig(
             proxy_username=parsed.username,
             proxy_password=parsed.password,
