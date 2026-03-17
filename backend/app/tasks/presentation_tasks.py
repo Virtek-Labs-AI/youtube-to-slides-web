@@ -1,6 +1,7 @@
 import os
 import uuid
 
+import httpx
 import structlog
 from celery import Celery
 from sqlalchemy import create_engine
@@ -53,13 +54,22 @@ def generate_presentation(presentation_id: int) -> None:
             filename = f"{presentation.video_id}_{uuid.uuid4().hex[:8]}.pptx"
 
             if settings.presenton_url:
-                # Generate nicely styled PPTX with Presenton, then inject reference links
-                slides_markdown = format_slides_as_markdown(slides_data)
-                pptx_bytes = presenton_service.generate_pptx(
-                    slides_markdown, presentation.title or presentation.video_id
-                )
-                pptx_bytes = inject_references(pptx_bytes, slides_data)
-                pptx_path = _save_pptx_bytes(pptx_bytes, filename)
+                # Generate nicely styled PPTX with Presenton, then inject reference links.
+                # Falls back to plain python-pptx if Presenton is unreachable.
+                try:
+                    slides_markdown = format_slides_as_markdown(slides_data)
+                    pptx_bytes = presenton_service.generate_pptx(
+                        slides_markdown, presentation.title or presentation.video_id
+                    )
+                    pptx_bytes = inject_references(pptx_bytes, slides_data)
+                    pptx_path = _save_pptx_bytes(pptx_bytes, filename)
+                except (httpx.ConnectError, httpx.TimeoutException, TimeoutError) as presenton_exc:
+                    logger.warning(
+                        "presenton_unavailable_falling_back",
+                        presentation_id=presentation_id,
+                        exc_type=type(presenton_exc).__name__,
+                    )
+                    pptx_path = render_pptx(slides_data, filename)
             else:
                 # Fallback: plain python-pptx renderer (dev without Presenton)
                 pptx_path = render_pptx(slides_data, filename)
