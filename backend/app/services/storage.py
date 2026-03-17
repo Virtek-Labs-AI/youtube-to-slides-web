@@ -36,7 +36,7 @@ def is_s3_enabled() -> bool:
     return bool(settings.s3_bucket)
 
 
-def _safe_filename(filename: str) -> str:
+def safe_filename(filename: str) -> str:
     """Strip characters that would break a Content-Disposition header filename value."""
     return re.sub(r'["\\\r\n]', "_", filename)
 
@@ -54,20 +54,22 @@ def upload_pptx(local_path: str, key: str) -> None:
     )
 
 
-def get_presigned_download_url(key: str, filename: str, expires_in: int = 3600) -> str:
-    """Return a pre-signed URL that allows direct download of the PPTX from S3."""
+def stream_pptx(key: str) -> Generator[bytes, None, None]:
+    """Stream S3 object bytes in chunks.
+
+    Intended for use with FastAPI StreamingResponse so the file is proxied
+    through the API rather than redirecting the client to S3. This avoids
+    CORS issues when the frontend fetches with withCredentials=true and S3
+    returns Access-Control-Allow-Origin: *.
+    """
     client = _s3_client()
-    safe_name = _safe_filename(filename)
-    return client.generate_presigned_url(
-        "get_object",
-        Params={
-            "Bucket": settings.s3_bucket,
-            "Key": key,
-            "ResponseContentDisposition": f'attachment; filename="{safe_name}"',
-            "ResponseContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-        },
-        ExpiresIn=expires_in,
-    )
+    response = client.get_object(Bucket=settings.s3_bucket, Key=key)
+    body = response["Body"]
+    try:
+        while chunk := body.read(65536):
+            yield chunk
+    finally:
+        body.close()
 
 
 @contextmanager

@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -137,9 +137,16 @@ async def download_presentation(
     filename = f"{presentation.title or presentation.video_id}.pptx"
 
     if storage.is_s3_enabled():
-        # pptx_path holds an S3 key — redirect to a pre-signed URL for direct download
-        presigned_url = storage.get_presigned_download_url(presentation.pptx_path, filename)
-        return RedirectResponse(url=presigned_url, status_code=302)
+        # Proxy the S3 object through the API rather than redirecting.
+        # A redirect to a pre-signed URL fails when the frontend fetches with
+        # withCredentials=true because S3 returns Access-Control-Allow-Origin: *,
+        # which browsers block for credentialed requests.
+        safe_filename = storage.safe_filename(filename)
+        return StreamingResponse(
+            storage.stream_pptx(presentation.pptx_path),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
+        )
 
     # Local filesystem path (docker-compose dev with shared volume)
     # Path traversal guard — ensure the file is within the designated storage directory
