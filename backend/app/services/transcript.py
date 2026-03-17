@@ -46,17 +46,20 @@ def extract_video_id(url: str) -> str | None:
 def _get_proxy_config() -> WebshareProxyConfig | GenericProxyConfig | None:
     """Build proxy config from YOUTUBE_PROXY_URL.
 
-    If the URL contains credentials and points to webshare.io, uses
-    WebshareProxyConfig for rotating residential IPs. Otherwise falls
-    back to GenericProxyConfig.
+    If the URL contains credentials (user:pass), uses WebshareProxyConfig so
+    requests rotate through Webshare's residential IP pool rather than a single
+    static IP. Webshare assigns a direct IP per connection using the credentials;
+    the proxy host in the URL is ignored by WebshareProxyConfig.
 
-    Expected format: http://user:pass@proxy.webshare.io:80
+    Falls back to GenericProxyConfig for credential-less proxy URLs.
+
+    Expected format: http://user:pass@<ip-or-host>:<port>
     """
     proxy_url = os.environ.get("YOUTUBE_PROXY_URL")
     if not proxy_url:
         return None
     parsed = urlparse(proxy_url)
-    if parsed.username and parsed.password and (parsed.hostname or "").endswith(".webshare.io"):
+    if parsed.username and parsed.password:
         return WebshareProxyConfig(
             proxy_username=parsed.username,
             proxy_password=parsed.password,
