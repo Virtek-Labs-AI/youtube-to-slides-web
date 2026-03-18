@@ -10,7 +10,14 @@ from typing import Any
 
 import httpx
 import structlog
-from tenacity import RetryError, retry, retry_if_exception_type, retry_if_result, stop_after_attempt, wait_exponential
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from app.core.config import settings
 
@@ -36,7 +43,11 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
             "verbosity": "standard",
             "export_as": "pptx",
             "include_title_slide": True,
-            **({"image_type": settings.presenton_image_type} if settings.presenton_image_type else {}),
+            **(
+                {"image_type": settings.presenton_image_type}
+                if settings.presenton_image_type
+                else {}
+            ),
         },
         timeout=60.0,  # generous for serverless cold-start wake-up
     )
@@ -51,10 +62,11 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
     logger.info("presenton_task_submitted", task_id=task_id, n_slides=len(slides_markdown))
 
     try:
-        result: dict[str, Any] = _poll_until_complete(base_url, task_id)
+        result: dict[str, Any] | None = _poll_until_complete(base_url, task_id)
     except RetryError:
         raise TimeoutError("Presenton generation timed out after 10 minutes")
 
+    assert result is not None
     server_path: str = result["path"]
     download_url = _build_download_url(base_url, server_path)
     logger.info("presenton_downloading_pptx", url=download_url)
@@ -67,7 +79,10 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
 @retry(
     wait=wait_exponential(multiplier=1, min=5, max=10),
     stop=stop_after_attempt(120),
-    retry=retry_if_result(lambda result: result is None) | retry_if_exception_type(httpx.HTTPStatusError),
+    retry=(
+        retry_if_result(lambda result: result is None)
+        | retry_if_exception_type(httpx.HTTPStatusError)
+    ),
 )
 def _poll_until_complete(base_url: str, task_id: str) -> dict[str, Any] | None:
     """Poll the Presenton status endpoint until generation completes.

@@ -31,7 +31,9 @@ def configure_structlog() -> None:
             structlog.processors.UnicodeDecoder(),
             structlog.processors.JSONRenderer(),
         ],
-        wrapper_class=structlog.make_filtering_bound_logger(logging.DEBUG if settings.debug else logging.INFO),
+        wrapper_class=structlog.make_filtering_bound_logger(
+            logging.DEBUG if settings.debug else logging.INFO
+        ),
         context_class=dict,
         logger_factory=structlog.PrintLoggerFactory(),
         cache_logger_on_first_use=True,

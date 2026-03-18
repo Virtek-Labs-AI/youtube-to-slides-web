@@ -1,8 +1,6 @@
 import io
 
-import pytest
 from pptx import Presentation
-from pptx.util import Inches
 
 from app.services.link_injector import _collect_refs, _timestamp_label, inject_references
 

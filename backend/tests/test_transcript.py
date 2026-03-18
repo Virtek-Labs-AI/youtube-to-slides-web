@@ -1,7 +1,7 @@
 import pytest
-
-from app.services.transcript import extract_video_id, _get_proxy_config
 from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
+
+from app.services.transcript import _get_proxy_config, extract_video_id
 
 
 @pytest.mark.parametrize(
