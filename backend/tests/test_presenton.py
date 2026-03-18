@@ -40,9 +40,7 @@ class TestGeneratePptx:
         mock_get: MagicMock,
         presenton_url: str = "http://presenton:5000",
     ) -> None:
-        mock_post.return_value = _mock_response(
-            {"path": "/app_data/exports/My Slides.pptx"}
-        )
+        mock_post.return_value = _mock_response({"path": "/app_data/exports/My Slides.pptx"})
         pptx_resp = MagicMock()
         pptx_resp.raise_for_status.return_value = None
         pptx_resp.content = b"FAKE_PPTX_CONTENT"
