@@ -51,7 +51,7 @@ class Settings(BaseSettings):
     # Defaults to "modern". Override via PRESENTON_TEMPLATE env var.
     # Note: Pexels image support is configured on the Presenton server via
     # IMAGE_PROVIDER=pexels and PEXELS_API_KEY env vars — not a per-request setting.
-    presenton_template: str = "modern"
+    presenton_template: str = "light"
 
 
 settings = Settings()  # type: ignore[call-arg]

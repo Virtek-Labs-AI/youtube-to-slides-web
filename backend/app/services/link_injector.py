@@ -1,93 +1,68 @@
 """Inject YouTube reference links into a Presenton-generated PPTX.
 
-Presenton produces beautifully styled slides but does not embed the per-bullet
-YouTube timestamp URLs. This module appends a 'Video References' slide so
-viewers can jump to the exact moment in the source video for each key point.
+Takes a list of references (slide index, bullet index, url) and adds
+hyperlinks directly to the matching bullet text runs in the PPTX.
 """
 
 import io
-from typing import Any
 
 from pptx import Presentation
-from pptx.dml.color import RGBColor
-from pptx.util import Inches, Pt
 
 
-def inject_references(pptx_bytes: bytes, slides_data: dict[str, Any]) -> bytes:
-    """Append a 'Video References' slide to a Presenton-generated PPTX.
+def inject_references(pptx_bytes: bytes, references: list[dict]) -> bytes:
+    """Add hyperlinks to bullet text in a PPTX based on reference mappings.
 
-    Collects all (slide_title, bullet_text, url) tuples from slides_data
-    and renders them as clickable hyperlinks on a new blank slide.
+    Each reference dict has: {"slide": int, "bullet": int, "url": str}
+    Hyperlinks are added directly to the first run of the matching paragraph.
+
     Returns the modified PPTX as bytes.
     """
-    refs = _collect_refs(slides_data)
-    if not refs:
+    if not references:
         return pptx_bytes
 
     prs = Presentation(io.BytesIO(pptx_bytes))
+    slides = list(prs.slides)
 
-    blank_layout = prs.slide_layouts[6]  # Blank
-    slide = prs.slides.add_slide(blank_layout)
+    for ref in references:
+        slide_idx = ref.get("slide")
+        bullet_idx = ref.get("bullet")
+        url = ref.get("url")
 
-    # Slide heading
-    title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.3), Inches(12.3), Inches(0.6))
-    tf = title_box.text_frame
-    run = tf.paragraphs[0].add_run()
-    run.text = "Video References"
-    run.font.bold = True
-    run.font.size = Pt(24)
-    run.font.color.rgb = RGBColor(0x1F, 0x1F, 0x1F)
+        if slide_idx is None or bullet_idx is None or not url:
+            continue
+        if slide_idx >= len(slides):
+            continue
 
-    # References body
-    body_box = slide.shapes.add_textbox(Inches(0.5), Inches(1.0), Inches(12.3), Inches(6.0))
-    tf = body_box.text_frame
-    tf.word_wrap = True
+        slide = slides[slide_idx]
 
-    first = True
-    current_section: str | None = None
-    for slide_title, bullet_text, url in refs:
-        if slide_title != current_section:
-            current_section = slide_title
-            para = tf.paragraphs[0] if first else tf.add_paragraph()
-            first = False
+        # Collect non-title text paragraphs
+        paragraphs = []
+        title_shape_id = None
+        if slide.shapes.title:
+            title_shape_id = slide.shapes.title.shape_id
+
+        for shape in slide.shapes:
+            if not shape.has_text_frame:
+                continue
+            if title_shape_id and shape.shape_id == title_shape_id:
+                continue
+            for para in shape.text_frame.paragraphs:
+                if para.text.strip():
+                    paragraphs.append(para)
+
+        if bullet_idx >= len(paragraphs):
+            continue
+
+        para = paragraphs[bullet_idx]
+
+        # Add hyperlink to the first run, or create one if none exist
+        if para.runs:
+            para.runs[0].hyperlink.address = url
+        else:
             run = para.add_run()
-            run.text = slide_title
-            run.font.bold = True
-            run.font.size = Pt(11)
-            run.font.color.rgb = RGBColor(0x33, 0x33, 0x33)
-
-        para = tf.add_paragraph()
-        para.level = 1
-        run = para.add_run()
-        run.text = f"{bullet_text}  {_timestamp_label(url)}"
-        run.font.size = Pt(9)
-        run.font.color.rgb = RGBColor(0x0D, 0x6E, 0xFD)
-        run.hyperlink.address = url
+            run.text = para.text
+            run.hyperlink.address = url
 
     out = io.BytesIO()
     prs.save(out)
     return out.getvalue()
-
-
-def _collect_refs(slides_data: dict[str, Any]) -> list[tuple[str, str, str]]:
-    refs: list[tuple[str, str, str]] = []
-    for slide in slides_data.get("slides", []):
-        title = slide.get("title", "")
-        for bullet in slide.get("bullets", []):
-            if not isinstance(bullet, dict):
-                continue
-            url = bullet.get("url", "")
-            if url:
-                refs.append((title, bullet.get("text", ""), url))
-    return refs
-
-
-def _timestamp_label(url: str) -> str:
-    if "?t=" in url:
-        try:
-            seconds = int(url.split("?t=")[1])
-            minutes, secs = divmod(seconds, 60)
-            return f"({minutes}:{secs:02d})"
-        except (ValueError, IndexError):
-            pass
-    return ""

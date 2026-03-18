@@ -14,7 +14,9 @@ from app.services import presenton as presenton_service
 from app.services import storage
 from app.services.link_injector import inject_references
 from app.services.pptx_renderer import render_pptx
-from app.services.slide_generator import format_slides_as_markdown, generate_slides_from_transcript
+from app.services.reference_matcher import match_references
+from app.services.slide_extractor import extract_slides
+from app.services.slide_generator import generate_slides_from_transcript
 from app.services.transcript import get_transcript
 
 # Transient errors that warrant retrying the Presenton call before falling back.
@@ -47,26 +49,24 @@ def generate_presentation(presentation_id: int) -> None:
             # Step 1: Get transcript
             transcript = get_transcript(presentation.video_id)
 
-            # Step 2: Generate slide outline via LLM (content + YouTube URLs)
-            slides_data = generate_slides_from_transcript(transcript, presentation.video_id)
-
-            slides_list = slides_data.get("slides", [])
-            if slides_list and slides_list[0].get("title"):
-                presentation.title = slides_list[0]["title"]
-
-            # Step 3: Render to PPTX
+            # Step 2: Render to PPTX
             filename = f"{presentation.video_id}_{uuid.uuid4().hex[:8]}.pptx"
 
             if settings.presenton_url:
-                # Generate nicely styled PPTX with Presenton, then inject reference links.
-                # Retries up to 3 times on transient errors; falls back to plain python-pptx
-                # if Presenton remains unreachable after all attempts.
+                # Presenton path: send raw transcript, let Presenton structure slides,
+                # then match references back via LLM and inject hyperlinks.
                 try:
-                    slides_markdown = format_slides_as_markdown(slides_data)
-                    pptx_bytes = _generate_with_presenton(
-                        slides_markdown, presentation.title or presentation.video_id
-                    )
-                    pptx_bytes = inject_references(pptx_bytes, slides_data)
+                    pptx_bytes = _generate_with_presenton(transcript)
+
+                    # Extract slide text and match bullets to timestamps
+                    slides_content = extract_slides(pptx_bytes)
+                    references = match_references(transcript, slides_content)
+                    pptx_bytes = inject_references(pptx_bytes, references)
+
+                    # Extract title from first slide
+                    if slides_content and slides_content[0].get("title"):
+                        presentation.title = slides_content[0]["title"]
+
                     pptx_path = _save_pptx_bytes(pptx_bytes, filename)
                 except (*_PRESENTON_TRANSIENT_ERRORS, TimeoutError, RuntimeError) as presenton_exc:
                     logger.warning(
@@ -76,9 +76,18 @@ def generate_presentation(presentation_id: int) -> None:
                         exc_msg=str(presenton_exc),
                         metric="presenton_fallback_total",
                     )
+                    # Fallback: LLM-structured slides + plain python-pptx
+                    slides_data = generate_slides_from_transcript(transcript, presentation.video_id)
+                    slides_list = slides_data.get("slides", [])
+                    if slides_list and slides_list[0].get("title"):
+                        presentation.title = slides_list[0]["title"]
                     pptx_path = render_pptx(slides_data, filename)
             else:
-                # Fallback: plain python-pptx renderer (dev without Presenton)
+                # No Presenton: LLM-structured slides + plain python-pptx
+                slides_data = generate_slides_from_transcript(transcript, presentation.video_id)
+                slides_list = slides_data.get("slides", [])
+                if slides_list and slides_list[0].get("title"):
+                    presentation.title = slides_list[0]["title"]
                 pptx_path = render_pptx(slides_data, filename)
 
             if storage.is_s3_enabled():
@@ -114,14 +123,9 @@ def generate_presentation(presentation_id: int) -> None:
     wait=wait_exponential(multiplier=2, min=5, max=30),
     reraise=True,
 )
-def _generate_with_presenton(slides_markdown: list[str], title: str) -> bytes:
-    """Call Presenton with up to 5 retry attempts on transient connection/HTTP errors.
-
-    The aggressive backoff (5s → 10s → 20s → 30s) is intentional: Presenton is
-    deployed as a serverless service and may need up to ~30s to cold-start before
-    accepting connections.
-    """
-    return presenton_service.generate_pptx(slides_markdown, title)
+def _generate_with_presenton(transcript: list[dict]) -> bytes:
+    """Call Presenton with up to 5 retry attempts on transient connection/HTTP errors."""
+    return presenton_service.generate_pptx(transcript)
 
 
 def _save_pptx_bytes(pptx_bytes: bytes, filename: str) -> str:

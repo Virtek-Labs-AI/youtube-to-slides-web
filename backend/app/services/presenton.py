@@ -12,25 +12,22 @@ from app.core.config import settings
 logger = structlog.get_logger(__name__)
 
 
-def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
+def generate_pptx(transcript: list[dict], n_slides: int = 10) -> bytes:
     """Generate a styled PPTX via the self-hosted Presenton API.
 
-    Single-step approach: POST with export_as="pptx" to generate and export
-    in one call. The response contains a download path for the PPTX file.
+    Sends the raw transcript text to Presenton and lets it handle all slide
+    structuring and layout. Returns the PPTX bytes.
     """
     base_url = settings.presenton_url.rstrip("/")  # type: ignore[union-attr]
-    content = "\n\n".join(slides_markdown)
-    n_slides = len(slides_markdown)
+    content = " ".join(seg["text"] for seg in transcript)
 
     resp = httpx.post(
         f"{base_url}/api/v1/ppt/presentation/generate",
         json={
             "content": content,
             "n_slides": n_slides,
-            "language": "English",
-            "template": "general",
-            "theme": settings.presenton_template,
             "export_as": "pptx",
+            "theme": settings.presenton_template,
         },
         timeout=300.0,
     )
