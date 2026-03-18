@@ -50,8 +50,22 @@ def match_references(
     Returns:
         List of reference dicts: [{"slide": int, "bullet": int, "url": str}]
     """
-    transcript_text = json.dumps(transcript, indent=2)
-    slides_text = json.dumps(slides_content, indent=2)
+    # Compact format: only include text and url to minimize token usage
+    compact_transcript = [
+        {"text": seg["text"], "url": seg["url"]} for seg in transcript
+    ]
+    transcript_text = json.dumps(compact_transcript, separators=(",", ":"))
+    slides_text = json.dumps(slides_content, separators=(",", ":"))
+
+    # Rough token estimate: ~4 chars per token. Reserve space for system prompt + response.
+    max_transcript_chars = 400_000  # ~100K tokens, leaves room for slides + prompt + output
+    if len(transcript_text) > max_transcript_chars:
+        logger.warning(
+            "transcript_truncated_for_matching",
+            original_chars=len(transcript_text),
+            max_chars=max_transcript_chars,
+        )
+        transcript_text = transcript_text[:max_transcript_chars]
 
     client = OpenAI(api_key=settings.openai_api_key)
     response = client.chat.completions.create(

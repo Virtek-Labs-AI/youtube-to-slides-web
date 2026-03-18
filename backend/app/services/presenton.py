@@ -41,6 +41,7 @@ def generate_pptx(transcript: list[dict], n_slides: int = 10) -> bytes:
 
     result = resp.json()
     download_path = result.get("path")
+    presentation_id = result.get("presentation_id")
     if not download_path:
         raise RuntimeError(f"No download path in Presenton response: {result}")
 
@@ -49,4 +50,16 @@ def generate_pptx(transcript: list[dict], n_slides: int = 10) -> bytes:
     download_url = f"{base_url}{download_path}" if download_path.startswith("/") else download_path
     pptx_resp = httpx.get(download_url, timeout=60.0)
     pptx_resp.raise_for_status()
+
+    # Clean up the presentation from Presenton to avoid accumulating data
+    if presentation_id:
+        try:
+            httpx.delete(
+                f"{base_url}/api/v1/ppt/presentation/{presentation_id}",
+                timeout=10.0,
+            )
+            logger.info("presenton_cleanup_complete", presentation_id=presentation_id)
+        except Exception:
+            logger.warning("presenton_cleanup_failed", presentation_id=presentation_id)
+
     return pptx_resp.content
