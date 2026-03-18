@@ -91,8 +91,8 @@ class TestGeneratePptx:
         self._setup_mocks(mock_post, mock_get)
         generate_pptx(["# Slide 1\n- point", "# Slide 2\n- other"], "Test Title")
         payload = mock_post.call_args.kwargs["json"]
-        assert payload["content"] == "Test Title"
-        assert payload["slides_markdown"] == ["# Slide 1\n- point", "# Slide 2\n- other"]
+        assert payload["content"] == "# Slide 1\n- point\n\n# Slide 2\n- other"
+        assert "slides_markdown" not in payload
         assert payload["n_slides"] == 2
 
     @patch("app.services.presenton.settings")
