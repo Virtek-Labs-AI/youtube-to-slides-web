@@ -43,11 +43,6 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
             "verbosity": "standard",
             "export_as": "pptx",
             "include_title_slide": True,
-            **(
-                {"image_type": settings.presenton_image_type}
-                if settings.presenton_image_type
-                else {}
-            ),
         },
         timeout=60.0,  # generous for serverless cold-start wake-up
     )
