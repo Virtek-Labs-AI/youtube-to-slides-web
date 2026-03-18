@@ -1,5 +1,5 @@
 import os
-from pathlib import Path
+from typing import Any
 
 from pptx import Presentation
 from pptx.dml.color import RGBColor
@@ -29,7 +29,7 @@ def render_pptx(slides_data: dict, filename: str) -> str:
     return filepath
 
 
-def _add_title_slide(prs: Presentation, data: dict) -> None:
+def _add_title_slide(prs: Any, data: dict) -> None:
     layout = prs.slide_layouts[0]  # Title Slide layout
     slide = prs.slides.add_slide(layout)
 
@@ -39,7 +39,7 @@ def _add_title_slide(prs: Presentation, data: dict) -> None:
         slide.placeholders[1].text = data.get("subtitle", "")
 
 
-def _add_content_slide(prs: Presentation, data: dict) -> None:
+def _add_content_slide(prs: Any, data: dict) -> None:
     layout = prs.slide_layouts[1]  # Title and Content layout
     slide = prs.slides.add_slide(layout)
 

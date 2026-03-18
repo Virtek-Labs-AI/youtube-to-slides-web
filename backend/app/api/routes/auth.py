@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Cookie, Depends, HTTPException, Response, status
 from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
@@ -20,7 +22,7 @@ from app.db.session import get_db
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 _COOKIE_SECURE = not settings.debug
-_COOKIE_SAMESITE = "lax"
+_COOKIE_SAMESITE: Literal["lax", "strict", "none"] = "lax"
 _STATE_COOKIE = "oauth_state"
 _JWT_COOKIE = "access_token"
 

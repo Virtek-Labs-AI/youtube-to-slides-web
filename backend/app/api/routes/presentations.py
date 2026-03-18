@@ -3,7 +3,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
@@ -15,6 +15,7 @@ from app.core.config import settings
 from app.core.security import decrypt_token
 from app.db.models import Presentation, PresentationStatus, User
 from app.db.session import get_db
+from app.services import storage
 from app.services.google_slides import import_to_google_slides
 from app.services.transcript import extract_video_id
 from app.tasks.presentation_tasks import generate_presentation
@@ -73,7 +74,8 @@ async def create_presentation(
         status=PresentationStatus.pending,
     )
     db.add(presentation)
-    await db.flush()
+    await db.commit()
+    await db.refresh(presentation)
 
     generate_presentation.delay(presentation.id)
 
@@ -133,6 +135,21 @@ async def download_presentation(
             detail="Presentation is not ready for download",
         )
 
+    filename = f"{presentation.title or presentation.video_id}.pptx"
+
+    if storage.is_s3_enabled():
+        # Proxy the S3 object through the API rather than redirecting.
+        # A redirect to a pre-signed URL fails when the frontend fetches with
+        # withCredentials=true because S3 returns Access-Control-Allow-Origin: *,
+        # which browsers block for credentialed requests.
+        safe_filename = storage.safe_filename(filename)
+        return StreamingResponse(
+            storage.stream_pptx(presentation.pptx_path),
+            media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+            headers={"Content-Disposition": f'attachment; filename="{safe_filename}"'},
+        )
+
+    # Local filesystem path (docker-compose dev with shared volume)
     # Path traversal guard — ensure the file is within the designated storage directory
     storage_root = os.path.realpath(settings.storage_path)
     resolved = os.path.realpath(presentation.pptx_path)
@@ -146,7 +163,6 @@ async def download_presentation(
             detail="Presentation file not found on server",
         )
 
-    filename = f"{presentation.title or presentation.video_id}.pptx"
     return FileResponse(
         path=str(path),
         media_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -183,15 +199,28 @@ async def import_google_slides_endpoint(
         )
 
     try:
-        # Decrypt tokens before passing to the Drive API
-        access_token = decrypt_token(user.google_access_token)
-        refresh_token = decrypt_token(user.google_refresh_token) if user.google_refresh_token else None
-        url = import_to_google_slides(
-            pptx_path=presentation.pptx_path,
-            title=presentation.title or f"Slides - {presentation.video_id}",
-            access_token=access_token,
-            refresh_token=refresh_token,
+        access_token = decrypt_token(user.google_access_token)  # type: ignore[arg-type]
+        refresh_token = (
+            decrypt_token(user.google_refresh_token) if user.google_refresh_token else None
         )
+        title = presentation.title or f"Slides - {presentation.video_id}"
+
+        if storage.is_s3_enabled():
+            # pptx_path is an S3 key — download to a temp file before uploading to Drive
+            with storage.local_pptx_path(presentation.pptx_path) as local_path:
+                url = import_to_google_slides(
+                    pptx_path=local_path,
+                    title=title,
+                    access_token=access_token,
+                    refresh_token=refresh_token,
+                )
+        else:
+            url = import_to_google_slides(
+                pptx_path=presentation.pptx_path,
+                title=title,
+                access_token=access_token,
+                refresh_token=refresh_token,
+            )
     except Exception:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,

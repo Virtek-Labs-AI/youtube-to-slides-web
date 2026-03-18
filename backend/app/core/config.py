@@ -25,11 +25,33 @@ class Settings(BaseSettings):
     # BFF pattern: Google redirects to the Next.js frontend proxy, not FastAPI directly.
     google_redirect_uri: str = "http://localhost:3000/api/auth/callback/google"
 
-    # Token encryption key (Fernet — generate with: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())")
+    # Token encryption key (Fernet symmetric encryption).
+    # python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
     token_encryption_key: str
 
-    # Storage
+    # Storage (local fallback for docker-compose dev)
     storage_path: str = "/tmp/youtube-to-slides"
 
+    # S3-compatible object storage (AWS S3, Cloudflare R2, etc.)
+    # When s3_bucket is set, PPTX files are stored in S3 instead of local disk.
+    # Required for Railway deployments where API and Celery run as separate services.
+    s3_bucket: str | None = None
+    # Set for Cloudflare R2 / MinIO; leave unset for AWS S3.
+    # Credentials and region come from standard AWS env vars:
+    # AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION.
+    s3_endpoint_url: str | None = None
 
-settings = Settings()
+    # Presenton self-hosted presentation generator (optional)
+    # When set, the Celery worker calls Presenton to generate visually styled slides,
+    # then injects YouTube reference links with python-pptx.
+    # Use the internal service URL, e.g. http://presenton:5000 (docker-compose / Railway).
+    # When unset, the plain python-pptx renderer is used as a fallback.
+    presenton_url: str | None = None
+    # Template for Presenton slides. Built-in options: general, modern, standard, swift.
+    # Defaults to "modern". Override via PRESENTON_TEMPLATE env var.
+    # Note: Pexels image support is configured on the Presenton server via
+    # IMAGE_PROVIDER=pexels and PEXELS_API_KEY env vars — not a per-request setting.
+    presenton_template: str = "light"
+
+
+settings = Settings()  # type: ignore[call-arg]
