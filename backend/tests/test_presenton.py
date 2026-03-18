@@ -2,7 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from app.services.presenton import _build_download_url, generate_pptx
+from app.services.presenton import generate_pptx
 
 
 def _mock_response(json_data: object, status_code: int = 200) -> MagicMock:
@@ -15,32 +15,13 @@ def _mock_response(json_data: object, status_code: int = 200) -> MagicMock:
     return resp
 
 
-class TestBuildDownloadUrl:
-    def test_happy_path(self) -> None:
-        url = _build_download_url("http://presenton:5000", "/app_data/exports/My Slides.pptx")
-        assert url == "http://presenton:5000/app_data/exports/My%20Slides.pptx"
-
-    def test_rejects_path_traversal(self) -> None:
-        with pytest.raises(ValueError, match="invalid export path"):
-            _build_download_url("http://presenton:5000", "/app_data/exports/../secret.pptx")
-
-    def test_rejects_backslash(self) -> None:
-        with pytest.raises(ValueError, match="invalid export path"):
-            _build_download_url("http://presenton:5000", "/exports/bad\\file.pptx")
-
-    def test_rejects_empty_filename(self) -> None:
-        with pytest.raises(ValueError, match="invalid export path"):
-            _build_download_url("http://presenton:5000", "/exports/")
-
-
 class TestGeneratePptx:
     def _setup_mocks(
         self,
         mock_post: MagicMock,
         mock_get: MagicMock,
-        presenton_url: str = "http://presenton:5000",
     ) -> None:
-        mock_post.return_value = _mock_response({"path": "/app_data/exports/My Slides.pptx"})
+        mock_post.return_value = _mock_response({"presentation_id": "abc-123"})
         pptx_resp = MagicMock()
         pptx_resp.raise_for_status.return_value = None
         pptx_resp.content = b"FAKE_PPTX_CONTENT"
@@ -70,13 +51,13 @@ class TestGeneratePptx:
         generate_pptx(["# Slide 1\n- point", "# Slide 2\n- other"], "Test Title")
         payload = mock_post.call_args.kwargs["json"]
         assert payload["content"] == "# Slide 1\n- point\n\n# Slide 2\n- other"
-        assert "slides_markdown" not in payload
+        assert "export_as" not in payload
         assert payload["n_slides"] == 2
 
     @patch("app.services.presenton.settings")
     @patch("httpx.get")
     @patch("httpx.post")
-    def test_uses_sync_endpoint(
+    def test_uses_sync_generate_endpoint(
         self, mock_post: MagicMock, mock_get: MagicMock, mock_settings: MagicMock
     ) -> None:
         mock_settings.presenton_url = "http://presenton:5000"
@@ -84,8 +65,22 @@ class TestGeneratePptx:
         self._setup_mocks(mock_post, mock_get)
         generate_pptx(["# Slide 1\n- point"], "Title")
         called_url = mock_post.call_args[0][0]
-        assert "/generate/async" not in called_url
         assert called_url.endswith("/api/v1/ppt/presentation/generate")
+
+    @patch("app.services.presenton.settings")
+    @patch("httpx.get")
+    @patch("httpx.post")
+    def test_export_uses_shapes_endpoint(
+        self, mock_post: MagicMock, mock_get: MagicMock, mock_settings: MagicMock
+    ) -> None:
+        mock_settings.presenton_url = "http://presenton:5000"
+        mock_settings.presenton_template = "modern"
+        self._setup_mocks(mock_post, mock_get)
+        generate_pptx(["# Slide 1\n- point"], "Title")
+        called_url = mock_get.call_args[0][0]
+        assert called_url.endswith("/api/v1/ppt/presentation/export/pptx")
+        called_params = mock_get.call_args.kwargs["params"]
+        assert called_params["presentationId"] == "abc-123"
 
     @patch("app.services.presenton.settings")
     @patch("httpx.get")
