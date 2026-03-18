@@ -102,7 +102,9 @@ def generate_presentation(presentation_id: int) -> None:
                 presentation_id=presentation_id,
                 exc_type=type(exc).__name__,
             )
-            presentation.error_message = f"Generation failed ({type(exc).__name__}). Please try again."
+            presentation.error_message = (
+                f"Generation failed ({type(exc).__name__}). Please try again."
+            )
             db.commit()
 
 

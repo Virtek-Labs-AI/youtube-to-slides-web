@@ -14,10 +14,10 @@ import pytest
 
 from app.tasks.presentation_tasks import _PRESENTON_TRANSIENT_ERRORS, _generate_with_presenton
 
-
 # ---------------------------------------------------------------------------
 # _generate_with_presenton — retry behaviour
 # ---------------------------------------------------------------------------
+
 
 def _make_transient_exc(exc_class: type) -> Exception:
     """Construct a transient exception instance; HTTPStatusError requires extra kwargs."""
@@ -41,7 +41,10 @@ class TestGenerateWithPresenton:
     def test_returns_bytes_on_success(self) -> None:
         """Returns bytes from presenton_service.generate_pptx on success."""
         expected = b"pptx-bytes"
-        with patch("app.tasks.presentation_tasks.presenton_service.generate_pptx", return_value=expected):
+        with patch(
+            "app.tasks.presentation_tasks.presenton_service.generate_pptx",
+            return_value=expected,
+        ):
             result = _generate_with_presenton.__wrapped__(["# Slide 1"], "My Title")
         assert result == expected
 
@@ -56,7 +59,10 @@ class TestGenerateWithPresenton:
                 raise httpx.ConnectError("refused")
             return b"success"
 
-        with patch("app.tasks.presentation_tasks.presenton_service.generate_pptx", side_effect=flaky):
+        with patch(
+            "app.tasks.presentation_tasks.presenton_service.generate_pptx",
+            side_effect=flaky,
+        ):
             result = _generate_with_presenton(["# Slide"], "Title")
 
         assert result == b"success"
@@ -76,6 +82,7 @@ class TestGenerateWithPresenton:
 # Fallback path in generate_presentation
 # ---------------------------------------------------------------------------
 
+
 class TestGeneratePresentationFallback:
     """generate_presentation falls back to render_pptx when Presenton fails."""
 
@@ -93,11 +100,17 @@ class TestGeneratePresentationFallback:
         with (
             patch("app.tasks.presentation_tasks.Session") as mock_session_cls,
             patch("app.tasks.presentation_tasks.get_transcript", return_value="transcript"),
-            patch("app.tasks.presentation_tasks.generate_slides_from_transcript", return_value=slides_data),
+            patch(
+                "app.tasks.presentation_tasks.generate_slides_from_transcript",
+                return_value=slides_data,
+            ),
             patch("app.tasks.presentation_tasks.format_slides_as_markdown", return_value=["# T"]),
             patch("app.tasks.presentation_tasks.inject_references", return_value=b"injected"),
             patch("app.tasks.presentation_tasks._save_pptx_bytes", return_value="/tmp/out.pptx"),
-            patch("app.tasks.presentation_tasks.render_pptx", return_value="/tmp/fallback.pptx") as mock_render,
+            patch(
+                "app.tasks.presentation_tasks.render_pptx",
+                return_value="/tmp/fallback.pptx",
+            ) as mock_render,
             patch("app.tasks.presentation_tasks.storage.is_s3_enabled", return_value=False),
             patch("app.tasks.presentation_tasks.settings") as mock_settings,
         ):
@@ -127,7 +140,9 @@ class TestGeneratePresentationFallback:
             RuntimeError("Presenton generation failed: quota exceeded"),
         ],
     )
-    def test_falls_back_to_render_pptx_on_presenton_failure(self, _common_patches, exc: Exception) -> None:
+    def test_falls_back_to_render_pptx_on_presenton_failure(
+        self, _common_patches, exc: Exception
+    ) -> None:
         """Falls back to render_pptx for every error type that Presenton can raise."""
         from app.tasks.presentation_tasks import generate_presentation
 

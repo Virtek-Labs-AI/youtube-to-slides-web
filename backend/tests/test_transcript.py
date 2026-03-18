@@ -1,7 +1,7 @@
 import pytest
-
-from app.services.transcript import extract_video_id, _get_proxy_config
 from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
+
+from app.services.transcript import _get_proxy_config, extract_video_id
 
 
 @pytest.mark.parametrize(
@@ -49,17 +49,15 @@ def test_extract_video_id(url: str, expected: str | None) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_proxy_config_no_env_vars_returns_empty_generic(monkeypatch) -> None:
-    """No proxy env vars → GenericProxyConfig with empty URLs to block system proxy inheritance."""
+def test_proxy_config_no_env_vars_returns_none(monkeypatch) -> None:
+    """No proxy env vars → None (library default)."""
     monkeypatch.delenv("YOUTUBE_WEBSHARE_USERNAME", raising=False)
     monkeypatch.delenv("YOUTUBE_WEBSHARE_PASSWORD", raising=False)
     monkeypatch.delenv("YOUTUBE_PROXY_URL", raising=False)
 
     config = _get_proxy_config()
 
-    assert isinstance(config, GenericProxyConfig)
-    assert config.http_url == ""
-    assert config.https_url == ""
+    assert config is None
 
 
 def test_proxy_config_youtube_proxy_url_returns_generic(monkeypatch) -> None:

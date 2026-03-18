@@ -49,7 +49,9 @@ def upload_pptx(local_path: str, key: str) -> None:
         settings.s3_bucket,
         key,
         ExtraArgs={
-            "ContentType": "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            "ContentType": (
+                "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            )
         },
     )
 

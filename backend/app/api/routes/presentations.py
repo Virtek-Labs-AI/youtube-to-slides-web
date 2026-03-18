@@ -15,8 +15,8 @@ from app.core.config import settings
 from app.core.security import decrypt_token
 from app.db.models import Presentation, PresentationStatus, User
 from app.db.session import get_db
-from app.services.google_slides import import_to_google_slides
 from app.services import storage
+from app.services.google_slides import import_to_google_slides
 from app.services.transcript import extract_video_id
 from app.tasks.presentation_tasks import generate_presentation
 
