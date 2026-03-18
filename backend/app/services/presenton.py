@@ -111,8 +111,10 @@ def _build_download_url(base_url: str, server_path: str) -> str:
     Validates that the filename from the API response contains no path
     traversal sequences before embedding it in the URL.
     """
+    if ".." in server_path or "\\" in server_path:
+        raise ValueError(f"Presenton returned an invalid export path: {server_path!r}")
     filename = server_path.rsplit("/", 1)[-1]
-    if not filename or ".." in filename or "\\" in filename:
+    if not filename:
         raise ValueError(f"Presenton returned an invalid export path: {server_path!r}")
     url = f"{base_url}/app_data/exports/{urllib.parse.quote(filename)}"
     if not url.startswith(base_url):
