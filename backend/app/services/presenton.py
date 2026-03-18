@@ -38,7 +38,7 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
             "content": title,
             "slides_markdown": slides_markdown,
             "n_slides": len(slides_markdown),
-            "template": "general",
+            "template": settings.presenton_template,
             "tone": "professional",
             "verbosity": "standard",
             "export_as": "pptx",
