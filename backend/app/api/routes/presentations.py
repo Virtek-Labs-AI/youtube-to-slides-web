@@ -74,7 +74,8 @@ async def create_presentation(
         status=PresentationStatus.pending,
     )
     db.add(presentation)
-    await db.flush()
+    await db.commit()
+    await db.refresh(presentation)
 
     generate_presentation.delay(presentation.id)
 

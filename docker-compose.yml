@@ -32,7 +32,7 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - .env.backend
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -41,27 +41,24 @@ services:
     volumes:
       - slides_storage:/tmp/youtube-to-slides
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
 
   presenton:
     image: ghcr.io/presenton/presenton:latest
-    profiles:
-      - presenton
     ports:
       - "5000:80"
     environment:
-      - MIGRATE_DATABASE_ON_STARTUP=true
       - LLM=openai
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_MODEL=gpt-4o-mini
       - DISABLE_ANONYMOUS_TRACKING=true
     volumes:
-      - presenton_data:/app_data
+      - presenton_data:/app/user_data
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:80/api/health || exit 1"]
+      test: ["CMD-SHELL", "curl -f http://localhost:80/ || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -70,7 +67,7 @@ services:
     build: ./backend
     command: celery -A celery_worker worker --loglevel=info
     env_file:
-      - .env.backend
+      - .env
     depends_on:
       db:
         condition: service_healthy
@@ -89,7 +86,7 @@ services:
     ports:
       - "3000:3000"
     env_file:
-      - .env.frontend
+      - .env
     depends_on:
       backend:
         condition: service_healthy
