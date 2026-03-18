@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     # (requires PEXELS_API_KEY configured on the Presenton server). Leave unset to
     # generate slides without images.
     presenton_image_type: str | None = None
+    # Template for Presenton slides. Built-in options: general, modern, standard, swift.
+    # Defaults to "general" (the stable default). Override via PRESENTON_TEMPLATE env var.
+    presenton_template: str = "general"
 
 
 settings = Settings()  # type: ignore[call-arg]
