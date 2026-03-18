@@ -1,8 +1,7 @@
 """Presenton self-hosted API client.
 
-Calls a self-hosted Presenton instance to generate a styled PPTX from
-pre-structured slide markdown. Presenton handles template selection, layout,
-and visual styling; our pipeline supplies the content structure.
+Calls a self-hosted Presenton instance to generate a styled PPTX.
+Presenton handles all slide structuring, layout, and visual styling.
 """
 
 import urllib.parse
@@ -27,27 +26,23 @@ logger = structlog.get_logger(__name__)
 def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
     """Generate a styled PPTX via the self-hosted Presenton API.
 
-    Passes pre-structured slide markdown so Presenton skips outline generation
-    and renders directly using its template engine. Returns raw PPTX bytes.
+    Passes the slide content as a single text blob so Presenton handles all
+    slide structuring and layout. Returns raw PPTX bytes.
     """
     base_url = settings.presenton_url.rstrip("/")  # type: ignore[union-attr]
+    content = "\n\n".join(slides_markdown)
+    n_slides = len(slides_markdown)
 
     resp = httpx.post(
         f"{base_url}/api/v1/ppt/presentation/generate/async",
         json={
-            "content": title,
-            "slides_markdown": slides_markdown,
-            "n_slides": len(slides_markdown),
+            "content": content,
+            "n_slides": n_slides,
             "template": settings.presenton_template,
             "tone": "professional",
             "verbosity": "standard",
             "export_as": "pptx",
             "include_title_slide": True,
-            **(
-                {"image_type": settings.presenton_image_type}
-                if settings.presenton_image_type
-                else {}
-            ),
         },
         timeout=60.0,  # generous for serverless cold-start wake-up
     )
@@ -59,7 +54,7 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
         )
     resp.raise_for_status()
     task_id = resp.json()["id"]
-    logger.info("presenton_task_submitted", task_id=task_id, n_slides=len(slides_markdown))
+    logger.info("presenton_task_submitted", task_id=task_id, n_slides=n_slides)
 
     try:
         result: dict[str, Any] | None = _poll_until_complete(base_url, task_id)
