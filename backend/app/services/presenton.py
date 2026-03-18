@@ -5,18 +5,9 @@ Presenton handles all slide structuring, layout, and visual styling.
 """
 
 import urllib.parse
-from typing import Any
 
 import httpx
 import structlog
-from tenacity import (
-    RetryError,
-    retry,
-    retry_if_exception_type,
-    retry_if_result,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from app.core.config import settings
 
@@ -26,15 +17,16 @@ logger = structlog.get_logger(__name__)
 def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
     """Generate a styled PPTX via the self-hosted Presenton API.
 
-    Passes the slide content as a single text blob so Presenton handles all
-    slide structuring and layout. Returns raw PPTX bytes.
+    Uses the synchronous endpoint which blocks until generation is complete
+    and returns the file path directly — no polling or internal Puppeteer
+    PPTX model conversion step. Returns raw PPTX bytes.
     """
     base_url = settings.presenton_url.rstrip("/")  # type: ignore[union-attr]
     content = "\n\n".join(slides_markdown)
     n_slides = len(slides_markdown)
 
     resp = httpx.post(
-        f"{base_url}/api/v1/ppt/presentation/generate/async",
+        f"{base_url}/api/v1/ppt/presentation/generate",
         json={
             "content": content,
             "n_slides": n_slides,
@@ -44,7 +36,7 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
             "export_as": "pptx",
             "include_title_slide": True,
         },
-        timeout=60.0,  # generous for serverless cold-start wake-up
+        timeout=300.0,  # blocks until generation complete; 5 min ceiling
     )
     if resp.is_error:
         logger.error(
@@ -53,51 +45,17 @@ def generate_pptx(slides_markdown: list[str], title: str) -> bytes:
             body=resp.text[:1000],
         )
     resp.raise_for_status()
-    task_id = resp.json()["id"]
-    logger.info("presenton_task_submitted", task_id=task_id, n_slides=n_slides)
 
-    try:
-        result: dict[str, Any] | None = _poll_until_complete(base_url, task_id)
-    except RetryError:
-        raise TimeoutError("Presenton generation timed out after 10 minutes")
-
-    assert result is not None
+    result = resp.json()
     server_path: str = result["path"]
+    logger.info("presenton_generation_complete", n_slides=n_slides, path=server_path)
+
     download_url = _build_download_url(base_url, server_path)
     logger.info("presenton_downloading_pptx", url=download_url)
 
     pptx_resp = httpx.get(download_url, timeout=60.0)
     pptx_resp.raise_for_status()
     return pptx_resp.content
-
-
-@retry(
-    wait=wait_exponential(multiplier=1, min=5, max=10),
-    stop=stop_after_attempt(120),
-    retry=(
-        retry_if_result(lambda result: result is None)
-        | retry_if_exception_type(httpx.HTTPStatusError)
-    ),
-)
-def _poll_until_complete(base_url: str, task_id: str) -> dict[str, Any] | None:
-    """Poll the Presenton status endpoint until generation completes.
-
-    Returns the completed task data dict, or None while still pending (causes
-    tenacity to retry). Raises RuntimeError on error status.
-    """
-    resp = httpx.get(
-        f"{base_url}/api/v1/ppt/presentation/status/{task_id}",
-        timeout=15.0,
-    )
-    resp.raise_for_status()
-    status = resp.json()
-    if status["status"] == "completed":
-        logger.info("presenton_task_completed", task_id=task_id)
-        return status["data"]
-    if status["status"] == "error":
-        raise RuntimeError(f"Presenton generation failed: {status.get('error')}")
-    logger.debug("presenton_task_pending", task_id=task_id, message=status.get("message"))
-    return None
 
 
 def _build_download_url(base_url: str, server_path: str) -> str:
