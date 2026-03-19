@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     secret_key: str
     frontend_url: str = "http://localhost:3000"
 
+    # Daily presentation limit per user (0 = unlimited).
+    # Future: override per-user via a tier/plan column on the User model.
+    daily_presentation_limit: int = 5
+
     # Database
     database_url: str
 

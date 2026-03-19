@@ -1,5 +1,5 @@
 import os
-from datetime import datetime
+from datetime import date, datetime, time, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
@@ -7,7 +7,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 from slowapi import Limiter
 from slowapi.util import get_remote_address
-from sqlalchemy import select
+from sqlalchemy import func as sa_func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
@@ -75,6 +75,25 @@ async def create_presentation(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Invalid YouTube URL",
         )
+
+    # Enforce daily presentation limit
+    limit = settings.daily_presentation_limit
+    if limit > 0:
+        today_start = datetime.combine(date.today(), time.min, tzinfo=timezone.utc)
+        count_result = await db.execute(
+            select(sa_func.count())
+            .select_from(Presentation)
+            .where(
+                Presentation.user_id == user.id,
+                Presentation.created_at >= today_start,
+            )
+        )
+        today_count = count_result.scalar() or 0
+        if today_count >= limit:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=f"Daily limit reached ({limit} presentations per day).",
+            )
 
     presentation = Presentation(
         user_id=user.id,

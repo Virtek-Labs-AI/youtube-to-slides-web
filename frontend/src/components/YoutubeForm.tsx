@@ -28,8 +28,8 @@ export default function YoutubeForm({ onSubmit }: YoutubeFormProps) {
     try {
       await onSubmit(url.trim());
       setUrl("");
-    } catch {
-      setError("Failed to submit. Please try again.");
+    } catch (err: any) {
+      setError(err?.message || "Failed to submit. Please try again.");
     } finally {
       setLoading(false);
     }

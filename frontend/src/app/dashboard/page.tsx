@@ -75,8 +75,13 @@ export default function DashboardPage() {
   }, [presentations, fetchPresentations]);
 
   const handleSubmitUrl = async (url: string) => {
-    await api.post("/api/presentations", { youtube_url: url });
-    await fetchPresentations();
+    try {
+      await api.post("/api/presentations", { youtube_url: url });
+      await fetchPresentations();
+    } catch (err: any) {
+      const detail = err?.response?.data?.detail;
+      throw new Error(detail || "Failed to submit. Please try again.");
+    }
   };
 
   const handleLogout = async () => {
