@@ -10,6 +10,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import api from "@/lib/api";
+import FolderPickerModal from "@/components/FolderPickerModal";
 
 export interface Presentation {
   id: string;
@@ -53,6 +54,8 @@ export default function PresentationCard({
 }: PresentationCardProps) {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState("");
+  const [importSuccess, setImportSuccess] = useState("");
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
 
   const status = STATUS_CONFIG[presentation.status];
   const StatusIcon = status.icon;
@@ -76,15 +79,24 @@ export default function PresentationCard({
     }
   };
 
-  const handleImportToSlides = async () => {
+  const handleImportToSlides = () => {
+    setImportError("");
+    setImportSuccess("");
+    setShowFolderPicker(true);
+  };
+
+  const handleFolderSelected = async (folderId: string | null) => {
+    setShowFolderPicker(false);
     setImporting(true);
     setImportError("");
     try {
       const { data } = await api.post(
-        `/api/presentations/${presentation.id}/import-google-slides`
+        `/api/presentations/${presentation.id}/import-google-slides`,
+        folderId ? { folder_id: folderId } : {}
       );
       if (data.google_slides_url) {
         window.open(data.google_slides_url, "_blank");
+        setImportSuccess("Successfully imported to Google Slides!");
       }
     } catch {
       setImportError("Failed to import to Google Slides.");
@@ -157,9 +169,18 @@ export default function PresentationCard({
         </div>
       )}
 
+      {importSuccess && (
+        <p className="mt-2 text-sm text-green-400">{importSuccess}</p>
+      )}
       {importError && (
         <p className="mt-2 text-sm text-red-400">{importError}</p>
       )}
+
+      <FolderPickerModal
+        open={showFolderPicker}
+        onClose={() => setShowFolderPicker(false)}
+        onSelect={handleFolderSelected}
+      />
     </div>
   );
 }

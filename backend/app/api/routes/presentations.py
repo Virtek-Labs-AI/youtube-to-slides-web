@@ -16,7 +16,7 @@ from app.core.security import decrypt_token
 from app.db.models import Presentation, PresentationStatus, User
 from app.db.session import get_db
 from app.services import storage
-from app.services.google_slides import import_to_google_slides
+from app.services.google_slides import import_to_google_slides, list_drive_folders
 from app.services.transcript import extract_video_id
 from app.tasks.presentation_tasks import generate_presentation
 
@@ -48,8 +48,17 @@ class PresentationResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class ImportGoogleSlidesRequest(BaseModel):
+    folder_id: str | None = None
+
+
 class GoogleSlidesResponse(BaseModel):
     google_slides_url: str
+
+
+class DriveFolderResponse(BaseModel):
+    id: str
+    name: str
 
 
 @router.post("", response_model=PresentationResponse, status_code=status.HTTP_201_CREATED)
@@ -170,9 +179,37 @@ async def download_presentation(
     )
 
 
+@router.get("/drive/folders", response_model=list[DriveFolderResponse])
+async def get_drive_folders(
+    parent_id: str = "root",
+    user: User = Depends(get_current_user),
+):
+    """List Google Drive folders inside a parent folder."""
+    if not user.google_access_token:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Google account not linked. Please re-authenticate.",
+        )
+
+    try:
+        access_token = decrypt_token(user.google_access_token)  # type: ignore[arg-type]
+        refresh_token = (
+            decrypt_token(user.google_refresh_token) if user.google_refresh_token else None
+        )
+        folders = list_drive_folders(access_token, refresh_token, parent_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="Failed to list Google Drive folders.",
+        )
+
+    return [DriveFolderResponse(id=f["id"], name=f["name"]) for f in folders]
+
+
 @router.post("/{presentation_id}/import-google-slides", response_model=GoogleSlidesResponse)
 async def import_google_slides_endpoint(
     presentation_id: int,
+    body: ImportGoogleSlidesRequest | None = None,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -204,6 +241,7 @@ async def import_google_slides_endpoint(
             decrypt_token(user.google_refresh_token) if user.google_refresh_token else None
         )
         title = presentation.title or f"Slides - {presentation.video_id}"
+        folder_id = body.folder_id if body else None
 
         if storage.is_s3_enabled():
             # pptx_path is an S3 key — download to a temp file before uploading to Drive
@@ -213,6 +251,7 @@ async def import_google_slides_endpoint(
                     title=title,
                     access_token=access_token,
                     refresh_token=refresh_token,
+                    folder_id=folder_id,
                 )
         else:
             url = import_to_google_slides(
@@ -220,6 +259,7 @@ async def import_google_slides_endpoint(
                 title=title,
                 access_token=access_token,
                 refresh_token=refresh_token,
+                folder_id=folder_id,
             )
     except Exception:
         raise HTTPException(
